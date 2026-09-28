@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vault | Diagnostic Mode</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        body { font-family: sans-serif; background: #f8f9fa; margin: 0; }
+        .header { background: #fff; padding: 15px 30px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; }
+        #login-screen { display: flex; height: 50vh; justify-content: center; align-items: center; flex-direction: column; }
+        #drive-ui { display: none; padding: 30px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+        .file-card { background: #fff; border: 1px solid #ccc; padding: 15px; cursor: pointer; }
+        
+        /* DIAGNOSTIC TERMINAL */
+        #debug-console { background: #1e1e1e; color: #00ff00; padding: 15px; margin: 20px; font-family: monospace; height: 250px; overflow-y: auto; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>Secure Vault</h2>
+        <span id="status-text">Booting...</span>
+    </div>
+
+    <div id="login-screen">
+        <button id="auth-btn" style="padding: 15px 30px; font-size: 18px; cursor: pointer;">Login with Google</button>
+    </div>
+
+    <div id="drive-ui">
+        <h3>Encrypted Archives</h3>
+        <div class="grid" id="file-grid"></div>
+    </div>
+
+    <!-- LIVE LOGS -->
+    <div id="debug-console">
+        <div>[SYSTEM START] Waiting for execution...</div>
+    </div>
+
+    <script src="./app.js"></script>
+</body>
+</html>
