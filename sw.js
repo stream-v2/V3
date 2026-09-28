@@ -1,75 +1,78 @@
 let vaultToken = null;
-let vaultCatalog = {};
 
-self.addEventListener('install', event => self.skipWaiting());
-self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
+self.addEventListener('install', (event) => {
+    event.waitUntil(self.skipWaiting());
+});
 
-// Listen for initialization data from app.js
-self.addEventListener('message', event => {
-    if (event.data.type === 'INIT_VAULT') {
+self.addEventListener('activate', (event) => {
+    event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'INIT_VAULT') {
         vaultToken = event.data.token;
-        vaultCatalog = event.data.catalog;
     }
 });
 
-self.addEventListener('fetch', event => {
+self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
-    
-    // Intercept only our virtual /stream/ requests
-    if (url.pathname.includes('/stream/')) {
+    if (url.pathname.includes('/vault-stream/')) {
         event.respondWith(handleStreamRequest(event.request, url));
     }
 });
 
 async function handleStreamRequest(request, url) {
-    if (!vaultToken) return new Response("Vault locked. No OAuth token.", { status: 401 });
+    if (!vaultToken) {
+        return new Response("Missing OAuth token in Service Worker.", { status: 401 });
+    }
 
     const fileId = url.pathname.split('/').pop();
-    const filename = url.searchParams.get('filename');
-    
-    // Check if the HTML5 player is asking for a specific byte range
     const rangeHeader = request.headers.get('Range') || 'bytes=0-';
-    const rangeMatch = rangeHeader.match(/bytes=(\d+)-(.*)/);
-    let requestedStart = parseInt(rangeMatch[1], 10);
+    const match = rangeHeader.match(/bytes=(\d+)-(.*)/);
     
-    // 1. Check the Catalog for the 7z offset
-    let videoStartOffset = 0;
-    if (vaultCatalog[filename]) {
-        videoStartOffset = vaultCatalog[filename].videoStart;
-    } else {
-        // DYNAMIC FALLBACK: If not in catalog, this is where we would inject 
-        // the logic to fetch the first/last few KB and parse the 7z header dynamically.
-        // For right now, assuming no offset if not cached.
-        console.warn(`File ${filename} not in catalog.json. Missing offset.`);
-    }
+    let requestedStart = parseInt(match[1], 10);
+    let requestedEnd = match[2] ? parseInt(match[2], 10) : '';
 
-    // 2. Map the Video Bytes -> 7z File Bytes
-    const realDriveStart = requestedStart + videoStartOffset;
-    const realDriveEnd = rangeMatch[2] ? (parseInt(rangeMatch[2], 10) + videoStartOffset) : '';
+    // Fixed 32-byte 7z signature header offset
+    const HEADER_OFFSET = 32;
+    const realStart = requestedStart + HEADER_OFFSET;
+    const realEnd = requestedEnd !== '' ? (requestedEnd + HEADER_OFFSET) : '';
 
-    // 3. Fetch from Google Drive API with OAuth Token
     const driveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
-    
-    const driveResponse = await fetch(driveUrl, {
-        headers: {
-            'Authorization': `Bearer ${vaultToken}`,
-            'Range': `bytes=${realDriveStart}-${realDriveEnd}`
-        }
-    });
 
-    if (!driveResponse.ok) {
-        return new Response("Drive API Error", { status: driveResponse.status });
+    try {
+        const driveResponse = await fetch(driveUrl, {
+            headers: {
+                'Authorization': `Bearer ${vaultToken}`,
+                'Range': `bytes=${realStart}-${realEnd}`
+            }
+        });
+
+        if (!driveResponse.ok) {
+            return new Response(`Drive API returned status ${driveResponse.status}`, { status: driveResponse.status });
+        }
+
+        const headers = new Headers();
+        headers.set('Content-Type', 'video/mp4');
+        headers.set('Accept-Ranges', 'bytes');
+
+        const driveContentRange = driveResponse.headers.get('Content-Range');
+        if (driveContentRange) {
+            // Adjust the reported Content-Range back to the client perspective
+            const rangeMatch = driveContentRange.match(/bytes (\d+)-(\d+)\/(\d+|\*)/);
+            if (rangeMatch) {
+                const adjStart = Math.max(0, parseInt(rangeMatch[1], 10) - HEADER_OFFSET);
+                const adjEnd = Math.max(0, parseInt(rangeMatch[2], 10) - HEADER_OFFSET);
+                const adjTotal = rangeMatch[3] !== '*' ? Math.max(0, parseInt(rangeMatch[3], 10) - HEADER_OFFSET) : '*';
+                headers.set('Content-Range', `bytes ${adjStart}-${adjEnd}/${adjTotal}`);
+            }
+        }
+
+        return new Response(driveResponse.body, {
+            status: 206,
+            headers: headers
+        });
+    } catch (err) {
+        return new Response(`Stream error: ${err.message}`, { status: 500 });
     }
-
-    // 4. Repackage the response for the Video Player
-    // The browser automatically deletes this stream from RAM as it plays
-    return new Response(driveResponse.body, {
-        status: 206,
-        headers: {
-            'Content-Type': 'video/mp4',
-            'Content-Range': driveResponse.headers.get('Content-Range'),
-            'Accept-Ranges': 'bytes',
-            'Content-Length': driveResponse.headers.get('Content-Length')
-        }
-    });
 }
