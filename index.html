@@ -3,38 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vault | Diagnostic Mode</title>
+    <title>Vault Stream Player</title>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
-        body { font-family: sans-serif; background: #f8f9fa; margin: 0; }
-        .header { background: #fff; padding: 15px 30px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; }
-        #login-screen { display: flex; height: 50vh; justify-content: center; align-items: center; flex-direction: column; }
-        #drive-ui { display: none; padding: 30px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
-        .file-card { background: #fff; border: 1px solid #ccc; padding: 15px; cursor: pointer; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 0; }
+        .header { background: #1e293b; padding: 16px 28px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
+        .header h2 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+        #status-text { font-size: 0.875rem; color: #94a3b8; }
         
-        /* DIAGNOSTIC TERMINAL */
-        #debug-console { background: #1e1e1e; color: #00ff00; padding: 15px; margin: 20px; font-family: monospace; height: 250px; overflow-y: auto; border-radius: 5px; }
+        #login-screen { display: flex; height: 40vh; justify-content: center; align-items: center; }
+        #auth-btn { background: #2563eb; color: #fff; border: none; padding: 14px 28px; font-size: 1rem; font-weight: 600; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
+        #auth-btn:hover { background: #1d4ed8; }
+        #auth-btn:disabled { background: #475569; cursor: not-allowed; }
+
+        #drive-ui { display: none; padding: 24px 28px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-top: 16px; }
+        .file-card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 16px; cursor: pointer; transition: border-color 0.2s, transform 0.1s; }
+        .file-card:hover { border-color: #3b82f6; transform: translateY(-2px); }
+        .file-card strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.95rem; margin-bottom: 6px; }
+        .file-card small { color: #94a3b8; font-size: 0.8rem; }
+
+        /* VIDEO MODAL */
+        #video-modal { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); justify-content: center; align-items: center; z-index: 1000; flex-direction: column; padding: 20px; }
+        .modal-content { background: #0f172a; border: 1px solid #334155; border-radius: 12px; width: 100%; max-width: 900px; overflow: hidden; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid #334155; }
+        .modal-header h3 { margin: 0; font-size: 1rem; color: #e2e8f0; max-width: 80%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #close-modal { background: none; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer; line-height: 1; }
+        #close-modal:hover { color: #fff; }
+        #video-container { width: 100%; aspect-ratio: 16 / 9; background: #000; display: flex; align-items: center; justify-content: center; }
+
+        /* CONSOLE */
+        #debug-console { background: #020617; border: 1px solid #1e293b; color: #4ade80; padding: 14px; margin: 24px 28px; font-family: ui-monospace, Menlo, Monaco, Consolas, monospace; font-size: 0.8rem; height: 180px; overflow-y: auto; border-radius: 8px; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h2>Secure Vault</h2>
+        <h2>📦 Vault Stream Player</h2>
         <span id="status-text">Booting...</span>
     </div>
 
     <div id="login-screen">
-        <button id="auth-btn" style="padding: 15px 30px; font-size: 18px; cursor: pointer;">Login with Google</button>
+        <button id="auth-btn">Login with Google</button>
     </div>
 
     <div id="drive-ui">
-        <h3>Encrypted Archives</h3>
+        <h3 style="margin: 0; font-size: 1.1rem; color: #cbd5e1;">Available Archives</h3>
         <div class="grid" id="file-grid"></div>
     </div>
 
-    <!-- LIVE LOGS -->
+    <div id="video-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="playing-title">Playing Video</h3>
+                <button id="close-modal">&times;</button>
+            </div>
+            <div id="video-container"></div>
+        </div>
+    </div>
+
     <div id="debug-console">
-        <div>[SYSTEM START] Waiting for execution...</div>
+        <div>[SYSTEM START] Ready for instructions...</div>
     </div>
 
     <script src="./app.js"></script>
