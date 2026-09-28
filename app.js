@@ -1,4 +1,4 @@
-const CLIENT_ID = '185170823583-vjr4i4umhv3vuv2f7h7m3cgtfvsl9ri5.apps.googleusercontent.com';
+const CLIENT_ID = '185170823583-t1g2t509cd1ogbhj9i9ctjb1rk9mpu8q.apps.googleusercontent.com';
 let oauthToken = null;
 
 const statusText = document.getElementById('status-text');
