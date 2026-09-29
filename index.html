@@ -3,24 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StreamVault Prototype</title>
+    <title>StreamVault | Drive Integration Test</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.29/dist/zip.min.js"></script>
+    
+    <!-- MANDATORY GOOGLE LOGIN SCRIPT -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body class="bg-slate-900 text-white p-8 font-sans max-w-5xl mx-auto flex flex-col min-h-screen">
 
     <div class="flex justify-between items-center mb-8 border-b border-slate-700 pb-4">
-        <h1 class="text-2xl font-bold">StreamVault Engine Test</h1>
+        <h1 class="text-2xl font-bold">StreamVault Engine</h1>
         <button id="authBtn" class="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded font-bold transition-colors">
             Connect Google Drive
         </button>
     </div>
 
-    <!-- Video Player (Hidden initially) -->
+    <!-- Video Player -->
     <div id="playerWrapper" class="hidden mb-8">
         <h2 id="videoTitle" class="text-lg font-bold mb-2 text-blue-400"></h2>
-        <video id="videoPlayer" class="w-full bg-black rounded-lg aspect-video border border-slate-700 shadow-lg shadow-black" controls></video>
+        <video id="videoPlayer" class="w-full bg-black rounded-lg aspect-video border border-slate-700 shadow-lg shadow-black" controls controlsList="nodownload"></video>
     </div>
 
     <!-- File List -->
@@ -32,7 +34,7 @@
             <h3 class="text-sm font-bold text-slate-400">System Terminal Log</h3>
             <span id="statusBox" class="text-xs font-mono text-yellow-400">System booting...</span>
         </div>
-        <div id="debugTerminal" class="w-full bg-black border border-slate-700 rounded-lg p-4 h-64 overflow-y-auto font-mono text-xs text-green-400 whitespace-pre-wrap"></div>
+        <div id="debugTerminal" class="w-full bg-black border border-slate-700 rounded-lg p-4 h-64 overflow-y-auto font-mono text-xs text-green-400 whitespace-pre-wrap shadow-inner"></div>
     </div>
 
     <script src="app.js"></script>
