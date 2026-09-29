@@ -2,175 +2,138 @@ const CLIENT_ID = '185170823583-t1g2t509cd1ogbhj9i9ctjb1rk9mpu8q.apps.googleuser
 let oauthToken = null;
 let pendingFile = null;
 
-const statusText = document.getElementById('status-text');
-const authBtn = document.getElementById('auth-btn');
-const loginScreen = document.getElementById('login-screen');
-const driveUi = document.getElementById('drive-ui');
-const fileGrid = document.getElementById('file-grid');
-const passwordModal = document.getElementById('password-modal');
-const submitPwdBtn = document.getElementById('submit-password');
-const targetFileLabel = document.getElementById('target-file-label');
-const archivePasswordInput = document.getElementById('archive-password');
-const videoModal = document.getElementById('video-modal');
-const videoContainer = document.getElementById('video-container');
-const playingTitle = document.getElementById('playing-title');
-const closeModal = document.getElementById('close-modal');
-const debugConsole = document.getElementById('debug-console');
+// UI Elements
+const els = {
+    statusText: document.getElementById('status-text'),
+    authBtn: document.getElementById('auth-btn'),
+    loginScreen: document.getElementById('login-screen'),
+    driveUi: document.getElementById('drive-ui'),
+    fileGrid: document.getElementById('file-grid'),
+    passwordModal: document.getElementById('password-modal'),
+    submitPwdBtn: document.getElementById('submit-password'),
+    cancelPwdBtn: document.getElementById('cancel-password'),
+    targetFileLabel: document.getElementById('target-file-label'),
+    archivePasswordInput: document.getElementById('archive-password'),
+    videoModal: document.getElementById('video-modal'),
+    videoContainer: document.getElementById('video-container'),
+    playingTitle: document.getElementById('playing-title'),
+    closeModal: document.getElementById('close-modal'),
+    debugConsole: document.getElementById('debug-console'),
+    loadingOverlay: document.getElementById('loading-overlay'),
+    loadingText: document.getElementById('loading-text')
+};
+
 let currentVideo = null;
 
 function logToScreen(msg, isError = false) {
     const time = new Date().toLocaleTimeString();
-    const color = isError ? '#f87171' : '#4ade80';
-    debugConsole.innerHTML += `<div style="color: ${color}">[${time}] ${msg}</div>`;
-    debugConsole.scrollTop = debugConsole.scrollHeight;
+    const color = isError ? 'text-red-400' : 'text-green-400';
+    els.debugConsole.innerHTML += `<div class="${color}">[${time}] ${msg}</div>`;
+    els.debugConsole.scrollTop = els.debugConsole.scrollHeight;
 }
 
-// 1. Initialize Engine
-async function initEngine() {
-    try {
-        logToScreen("Booting Decryption Engine & Service Worker...");
-        await navigator.serviceWorker.register('./sw.js');
-        await navigator.serviceWorker.ready;
-        return true;
-    } catch (err) {
-        logToScreen(`SW Error: ${err.message}`, true);
-        return false;
-    }
+function showLoader(text) {
+    els.loadingText.innerText = text;
+    els.loadingOverlay.classList.remove('hidden');
 }
 
-window.onload = function () {
+function hideLoader() {
+    els.loadingOverlay.classList.add('hidden');
+}
+
+window.onload = async function () {
     logToScreen("System Booting...");
     
-    // 1. Boot Service Worker in the background (Do not block the login button!)
-    initEngine();
+    try {
+        await navigator.serviceWorker.register('./sw.js');
+        await navigator.serviceWorker.ready;
+        logToScreen("Decryption Engine Ready.");
+    } catch (err) {
+        logToScreen(`[SW_ERR] ${err.message}`, true);
+    }
 
-    // 2. Initialize Google Login
     let tokenClient;
     try {
-        if (typeof google === 'undefined') {
-            logToScreen("[AUTH_ERR_01] Google script blocked by browser or adblocker.", true);
-            return;
-        }
-
         tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID, // Ensure your Client ID at the top is correct!
+            client_id: CLIENT_ID,
             scope: 'https://www.googleapis.com/auth/drive.readonly',
             callback: (response) => {
-                logToScreen("OAuth Success. Tunneling token to vault...");
-                authBtn.disabled = false;
-                authBtn.innerText = "Login with Google";
-
                 if (response.error || !response.access_token) return logToScreen("Auth failed.", true);
                 
                 oauthToken = response.access_token;
-                
                 if (navigator.serviceWorker.controller) {
                     navigator.serviceWorker.controller.postMessage({ type: 'INIT_VAULT', token: oauthToken });
                 }
 
-                loginScreen.style.display = 'none';
-                driveUi.style.display = 'block';
-                statusText.innerText = "Vault Connected";
+                els.loginScreen.classList.add('hidden');
+                els.driveUi.classList.remove('hidden');
+                els.statusText.innerText = "Vault Connected";
                 loadDriveFiles();
-            },
-            error_callback: (err) => {
-                authBtn.disabled = false;
-                authBtn.innerText = "Login with Google";
-                logToScreen(`Google Popup Error: ${err.type}`, true);
             }
         });
-        
-        logToScreen("Login system ready.");
     } catch (err) {
         logToScreen(`Client Error: ${err.message}`, true);
     }
 
-    // 3. The Button Click Event (Now with visual feedback restored)
-    authBtn.onclick = () => {
-        authBtn.disabled = true;
-        authBtn.innerText = "Authorizing...";
-        logToScreen("Opening login popup...");
-        
-        if (tokenClient) {
-            tokenClient.requestAccessToken({ prompt: 'select_account' });
-        } else {
-            logToScreen("Cannot open popup. Google client failed to initialize.", true);
-        }
-    };
-};
-    } catch (err) {
-        logToScreen(`Client Error: ${err.message}`, true);
-    }
-
-    authBtn.onclick = () => tokenClient.requestAccessToken({ prompt: 'select_account' });
+    els.authBtn.onclick = () => tokenClient.requestAccessToken({ prompt: 'select_account' });
 };
 
 async function loadDriveFiles() {
-    logToScreen("Scanning Drive for strict .7z Archives...");
+    logToScreen("Scanning Drive...");
     try {
-        // 1. Strict API Query: fileExtension must be exactly 7z
         const query = encodeURIComponent("fileExtension = '7z' and trashed = false");
         const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,size)&pageSize=100`, {
             headers: { 'Authorization': `Bearer ${oauthToken}` }
         });
 
-        if (!res.ok) {
-            logToScreen(`[API_ERR_02] Drive API rejected request: ${res.status}`, true);
-            return;
-        }
-
+        if (!res.ok) throw new Error(`API ${res.status}`);
+        
         const data = await res.json();
-        fileGrid.innerHTML = '';
-
-        // 2. JavaScript Armor: Physically ensure the name ends with .7z
+        els.fileGrid.innerHTML = '';
         const validFiles = (data.files || []).filter(file => file.name.toLowerCase().endsWith('.7z'));
 
-        if (validFiles.length === 0) {
-            return logToScreen("No strict .7z files found in Drive.", true);
-        }
-
-        logToScreen(`Filtered down to ${validFiles.length} verified archives.`);
-        
         validFiles.forEach(file => {
             const sizeMB = file.size ? Math.round(file.size / 1024 / 1024) : 'Unknown';
             const card = document.createElement('div');
-            card.className = 'file-card';
-            card.innerHTML = `<strong>${file.name}</strong><small>${sizeMB} MB</small>`;
+            // Tailwind Card Styling
+            card.className = 'bg-slate-800 border border-slate-700 rounded-lg p-4 cursor-pointer hover:border-blue-500 hover:-translate-y-1 transition-all group';
+            card.innerHTML = `
+                <div class="flex items-start gap-3">
+                    <i class="fa-solid fa-file-zipper text-2xl text-slate-500 group-hover:text-blue-400 transition-colors"></i>
+                    <div class="overflow-hidden">
+                        <strong class="block truncate text-sm font-medium text-slate-200">${file.name}</strong>
+                        <small class="text-slate-400 text-xs">${sizeMB} MB</small>
+                    </div>
+                </div>`;
             card.onclick = () => {
                 pendingFile = file;
-                targetFileLabel.innerText = file.name;
-                archivePasswordInput.value = '';
-                passwordModal.style.display = 'flex';
-                archivePasswordInput.focus();
+                els.targetFileLabel.innerText = file.name;
+                els.archivePasswordInput.value = '';
+                els.passwordModal.classList.remove('hidden');
+                els.archivePasswordInput.focus();
             };
-            fileGrid.appendChild(card);
+            els.fileGrid.appendChild(card);
         });
+        logToScreen(`Rendered ${validFiles.length} archives.`);
     } catch (err) {
-        logToScreen(`[API_ERR_02] Network/API Error: ${err.message}`, true);
+        logToScreen(`[API_ERR] ${err.message}`, true);
     }
 }
 
-// 2. Cryptographic Unlock & Tail Fetch
-submitPwdBtn.onclick = async () => {
-    const password = archivePasswordInput.value;
-    if (!password) return alert("Password required.");
+els.submitPwdBtn.onclick = async () => {
+    const password = els.archivePasswordInput.value;
+    if (!password) return;
     
-    submitPwdBtn.innerText = "Decrypting Header...";
-    submitPwdBtn.disabled = true;
-    logToScreen(`Initializing decryption sequence for ${pendingFile.name}...`);
+    els.passwordModal.classList.add('hidden');
+    showLoader("Deriving AES Keys..."); // UI LOADING FEEDBACK
+    logToScreen(`Unlocking ${pendingFile.name}...`);
 
     try {
-        logToScreen("Fetching 7z End-Of-File metadata...");
         const tailRes = await fetch(`https://www.googleapis.com/drive/v3/files/${pendingFile.id}?alt=media`, {
-            headers: { 
-                'Authorization': `Bearer ${oauthToken}`,
-                'Range': `bytes=-32768` // Fetch last 32KB
-            }
+            headers: { 'Authorization': `Bearer ${oauthToken}`, 'Range': `bytes=-32768` }
         });
 
-        if (!tailRes.ok) throw new Error(`Failed to fetch archive tail (Status: ${tailRes.status})`);
-        
-        logToScreen("Metadata retrieved. Handoff to stream processor...");
+        if (!tailRes.ok) throw new Error(`Metadata fetch failed (${tailRes.status})`);
         
         if (navigator.serviceWorker.controller) {
             navigator.serviceWorker.controller.postMessage({
@@ -180,48 +143,39 @@ submitPwdBtn.onclick = async () => {
                 fileSize: pendingFile.size
             });
         }
-
-        passwordModal.style.display = 'none';
-        submitPwdBtn.innerText = "Unlock & Stream";
-        submitPwdBtn.disabled = false;
         
-        openPlayer(pendingFile.id, pendingFile.name);
+        setTimeout(() => {
+            hideLoader();
+            openPlayer(pendingFile.id, pendingFile.name);
+        }, 1000); // Artificial delay to ensure SW memory is set before video tags fires
 
     } catch (err) {
-        logToScreen(`Header Decryption Failed: ${err.message}`, true);
-        submitPwdBtn.innerText = "Unlock & Stream";
-        submitPwdBtn.disabled = false;
+        hideLoader();
+        logToScreen(`[DEC_ERR] ${err.message}`, true);
     }
 };
 
-document.getElementById('cancel-password').onclick = () => {
-    passwordModal.style.display = 'none';
+els.cancelPwdBtn.onclick = () => {
+    els.passwordModal.classList.add('hidden');
     pendingFile = null;
 };
 
-// 3. Launch Video Player
 function openPlayer(fileId, filename) {
-    playingTitle.innerText = filename;
-    
+    els.playingTitle.innerText = filename;
     const streamUrl = `./vault-stream/${fileId}?filename=${encodeURIComponent(filename)}`;
 
     currentVideo = document.createElement('video');
     currentVideo.controls = true;
     currentVideo.autoplay = true;
-    currentVideo.style.width = '100%';
-    currentVideo.style.height = '100%';
+    currentVideo.className = 'w-full h-full';
     currentVideo.src = streamUrl;
 
-    currentVideo.onerror = () => {
-        logToScreen(`[DEC_ERR_04] Video element playback error. Stream interrupted or format unsupported.`, true);
-    };
-
-    videoContainer.innerHTML = '';
-    videoContainer.appendChild(currentVideo);
-    videoModal.style.display = 'flex';
+    els.videoContainer.innerHTML = '';
+    els.videoContainer.appendChild(currentVideo);
+    els.videoModal.classList.remove('hidden');
 }
 
-closeModal.onclick = () => {
+els.closeModal.onclick = () => {
     if (currentVideo) {
         currentVideo.pause();
         currentVideo.removeAttribute('src');
@@ -229,7 +183,7 @@ closeModal.onclick = () => {
         currentVideo.remove();
         currentVideo = null;
     }
-    videoContainer.innerHTML = '';
-    videoModal.style.display = 'none';
+    els.videoContainer.innerHTML = '';
+    els.videoModal.classList.add('hidden');
     logToScreen("Stream closed.");
 };
