@@ -69,6 +69,7 @@ window.onload = async function () {
 
     authBtn.onclick = () => tokenClient.requestAccessToken({ prompt: 'select_account' });
 };
+
 async function loadDriveFiles() {
     logToScreen("Scanning Drive for strict .7z Archives...");
     try {
@@ -86,7 +87,7 @@ async function loadDriveFiles() {
         const data = await res.json();
         fileGrid.innerHTML = '';
 
-        // 2. JavaScript Armor: Physically ensure the name ends with .7z (kills .7z.par2)
+        // 2. JavaScript Armor: Physically ensure the name ends with .7z
         const validFiles = (data.files || []).filter(file => file.name.toLowerCase().endsWith('.7z'));
 
         if (validFiles.length === 0) {
@@ -113,10 +114,6 @@ async function loadDriveFiles() {
         logToScreen(`[API_ERR_02] Network/API Error: ${err.message}`, true);
     }
 }
-    } catch (err) {
-        logToScreen(`API Error: ${err.message}`, true);
-    }
-}
 
 // 2. Cryptographic Unlock & Tail Fetch
 submitPwdBtn.onclick = async () => {
@@ -128,8 +125,6 @@ submitPwdBtn.onclick = async () => {
     logToScreen(`Initializing decryption sequence for ${pendingFile.name}...`);
 
     try {
-        // Step A: Fetch the END of the file from Google Drive to read the 7z Header
-        // 7z headers are typically in the last 32KB
         logToScreen("Fetching 7z End-Of-File metadata...");
         const tailRes = await fetch(`https://www.googleapis.com/drive/v3/files/${pendingFile.id}?alt=media`, {
             headers: { 
@@ -138,9 +133,8 @@ submitPwdBtn.onclick = async () => {
             }
         });
 
-        if (!tailRes.ok) throw new Error("Failed to fetch archive tail.");
+        if (!tailRes.ok) throw new Error(`Failed to fetch archive tail (Status: ${tailRes.status})`);
         
-        // Pass the credentials to the Service Worker for the live stream
         logToScreen("Metadata retrieved. Handoff to stream processor...");
         
         if (navigator.serviceWorker.controller) {
@@ -174,7 +168,6 @@ document.getElementById('cancel-password').onclick = () => {
 function openPlayer(fileId, filename) {
     playingTitle.innerText = filename;
     
-    // The stream goes through the SW tunnel
     const streamUrl = `./vault-stream/${fileId}?filename=${encodeURIComponent(filename)}`;
 
     currentVideo = document.createElement('video');
@@ -183,6 +176,10 @@ function openPlayer(fileId, filename) {
     currentVideo.style.width = '100%';
     currentVideo.style.height = '100%';
     currentVideo.src = streamUrl;
+
+    currentVideo.onerror = () => {
+        logToScreen(`[DEC_ERR_04] Video element playback error. Stream interrupted or format unsupported.`, true);
+    };
 
     videoContainer.innerHTML = '';
     videoContainer.appendChild(currentVideo);
