@@ -70,7 +70,6 @@ class DriveZipReader extends zip.Reader {
 
     async readUint8Array(offset, length) {
         const end = offset + length - 1;
-        // Fetch strictly positive byte ranges from the direct CDN URL
         const res = await fetch(this.directUrl, {
             headers: {
                 'Authorization': `Bearer ${this.token}`,
@@ -108,7 +107,6 @@ async function streamDecryptedVideo(fileId) {
     try {
         sysLog("Initializing Custom Google Drive Engine...");
         
-        // Pass our custom reader into zip.js
         const customReader = new DriveZipReader(fileId, authToken);
         const zipReader = new zip.ZipReader(customReader);
         
@@ -133,7 +131,9 @@ async function streamDecryptedVideo(fileId) {
 
         const fileSize = videoEntry.uncompressedSize;
         const { readable, writable } = new TransformStream();
-        const streamWriter = new zip.WritableStreamWriter(writable);
+        
+        // CRITICAL FIX: The correct zip.js class is WritableWriter (not WritableStreamWriter)
+        const streamWriter = new zip.WritableWriter(writable);
 
         sysLog("Igniting AES-256 decryption pipe...");
         
