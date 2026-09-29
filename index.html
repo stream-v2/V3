@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StreamVault HLS Pro</title>
+    
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
     <style>
         :root {
             --bg-main: #0d0f12;
@@ -18,88 +20,74 @@
             --danger: #f85149;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background: var(--bg-main); color: var(--text-main); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
-        /* --- Header & Top Bar --- */
         header { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
-        .logo { font-size: 1.15rem; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; color: var(--accent); }
-        .auth-bar { display: flex; gap: 12px; align-items: center; }
-        input[type="password"], input[type="text"] { background: #0b0c0e; border: 1px solid var(--border); color: #fff; padding: 7px 12px; border-radius: 6px; font-size: 0.9rem; outline: none; }
-        input[type="password"]:focus, input[type="text"]:focus { border-color: var(--accent); }
-        button { background: var(--accent); color: #000; border: none; font-weight: 600; padding: 7px 14px; border-radius: 6px; cursor: pointer; transition: background 0.2s; font-size: 0.85rem; }
+        .logo { font-size: 1.15rem; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+        .auth-bar { display: flex; gap: 10px; align-items: center; }
+        input[type="password"] { background: #0b0c0e; border: 1px solid var(--border); color: #fff; padding: 7px 10px; border-radius: 6px; font-size: 0.85rem; outline: none; }
+        input[type="password"]:focus { border-color: var(--accent); }
+        button { background: var(--accent); color: #000; border: none; font-weight: 600; padding: 7px 16px; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 0.85rem; }
         button:hover { background: var(--accent-hover); }
-        button.secondary { background: #21262d; color: var(--text-main); border: 1px solid var(--border); }
-        button.secondary:hover { background: #30363d; }
 
-        /* --- Layout Container --- */
         .workspace { display: flex; flex: 1; height: calc(100vh - 61px); overflow: hidden; }
-
-        /* --- Sidebar File Explorer --- */
-        .sidebar { width: 340px; background: var(--bg-card); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
-        .sidebar-header { padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 0.85rem; font-weight: 600; color: var(--text-sub); display: flex; justify-content: space-between; align-items: center; }
+        .sidebar { width: 320px; background: var(--bg-card); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+        .sidebar-header { padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 0.85rem; font-weight: 600; color: var(--text-sub); display: flex; justify-content: space-between; }
         .file-list { flex: 1; overflow-y: auto; list-style: none; }
-        .file-item { padding: 12px 16px; border-bottom: 1px solid #1f242c; font-size: 0.88rem; cursor: pointer; line-height: 1.4; display: flex; flex-direction: column; gap: 4px; }
+        .file-item { padding: 12px 16px; border-bottom: 1px solid #1f242c; font-size: 0.88rem; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
         .file-item:hover { background: #1c2128; }
         .file-item.active { background: #262c36; border-left: 3px solid var(--accent); }
-        .file-item .title { font-weight: 500; color: var(--text-main); word-break: break-word; }
-        .file-item .folder { font-size: 0.75rem; color: var(--text-sub); }
+        .file-item .title { font-weight: 500; word-break: break-word; }
+        .file-item .meta { font-size: 0.75rem; color: var(--text-sub); }
 
-        /* --- VLC Player Area --- */
-        .stage { flex: 1; display: flex; flex-direction: column; position: relative; background: #000; justify-content: center; align-items: center; }
-        .video-wrapper { width: 100%; height: 100%; position: relative; display: flex; align-items: center; justify-content: center; background: #000; }
+        .stage { flex: 1; display: flex; flex-direction: column; position: relative; background: #000; }
+        .video-wrapper { width: 100%; height: 100%; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
         video { width: 100%; height: 100%; max-height: 100vh; outline: none; }
 
-        /* --- Custom VLC Control Deck --- */
-        .player-deck { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, rgba(10,10,12,0.95), rgba(10,10,12,0.6) 70%, transparent); padding: 16px 20px 12px; display: flex; flex-direction: column; gap: 8px; opacity: 0; transition: opacity 0.25s ease; z-index: 10; }
+        .player-deck { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, rgba(10,10,12,0.95), transparent); padding: 20px 20px 12px; display: flex; flex-direction: column; gap: 10px; opacity: 0; transition: opacity 0.3s; z-index: 10; }
         .video-wrapper:hover .player-deck, .player-deck.locked { opacity: 1; }
 
-        /* Scrubber Bar */
-        .timeline-container { position: relative; width: 100%; height: 8px; background: rgba(255, 255, 255, 0.15); border-radius: 4px; cursor: pointer; }
-        .timeline-buffer { position: absolute; height: 100%; background: rgba(255, 255, 255, 0.3); border-radius: 4px; width: 0%; }
-        .timeline-progress { position: absolute; height: 100%; background: var(--accent); border-radius: 4px; width: 0%; }
+        .timeline-container { position: relative; width: 100%; height: 6px; background: rgba(255, 255, 255, 0.2); border-radius: 3px; cursor: pointer; }
+        .timeline-buffer { position: absolute; height: 100%; background: rgba(255, 255, 255, 0.4); border-radius: 3px; width: 0%; }
+        .timeline-progress { position: absolute; height: 100%; background: var(--accent); border-radius: 3px; width: 0%; }
 
-        /* Control Rows */
         .controls-row { display: flex; justify-content: space-between; align-items: center; }
-        .control-group { display: flex; align-items: center; gap: 8px; }
-        .ctrl-btn { background: none; border: none; color: var(--text-main); font-size: 1.1rem; padding: 6px 8px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .ctrl-btn:hover { background: rgba(255, 255, 255, 0.12); color: var(--accent); }
-        .time-label { font-size: 0.82rem; font-family: monospace; color: var(--text-main); cursor: pointer; margin-left: 8px; }
+        .control-group { display: flex; align-items: center; gap: 6px; }
+        .ctrl-btn { background: none; border: none; color: #fff; font-size: 1.1rem; padding: 6px 10px; border-radius: 4px; cursor: pointer; }
+        .ctrl-btn:hover { background: rgba(255, 255, 255, 0.15); color: var(--accent); }
+        .time-label { font-size: 0.85rem; font-family: monospace; cursor: pointer; margin-left: 10px; }
+        
+        .volume-box { display: flex; align-items: center; gap: 8px; margin-left: 10px; }
+        .vol-slider { -webkit-appearance: none; width: 80px; height: 4px; background: #555; border-radius: 2px; cursor: pointer; }
+        .vol-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: var(--accent); border-radius: 50%; }
+        .boost-badge { font-size: 0.75rem; padding: 2px 5px; background: #262c36; color: var(--accent); border-radius: 3px; font-weight: bold; }
+        .deck-select { background: #1c2128; border: 1px solid var(--border); color: #fff; padding: 4px; font-size: 0.85rem; border-radius: 4px; outline: none; }
 
-        /* Volume & Audio Boost */
-        .volume-box { display: flex; align-items: center; gap: 6px; }
-        .vol-slider { -webkit-appearance: none; width: 70px; height: 4px; border-radius: 2px; background: #444; outline: none; }
-        .vol-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); cursor: pointer; }
-        .boost-badge { font-size: 0.72rem; padding: 2px 4px; border-radius: 3px; font-weight: 700; background: #262c36; color: var(--accent); }
-
-        /* Dropdowns */
-        .deck-select { background: #1c2128; border: 1px solid var(--border); color: #fff; padding: 4px 6px; font-size: 0.8rem; border-radius: 4px; outline: none; }
-
-        /* Logs Console Drawer */
-        .logs-drawer { height: 120px; background: #08090b; border-top: 1px solid var(--border); padding: 8px 14px; font-family: monospace; font-size: 0.78rem; overflow-y: auto; color: var(--text-sub); }
+        .logs-drawer { height: 130px; background: #08090b; border-top: 1px solid var(--border); padding: 10px 15px; font-family: monospace; font-size: 0.8rem; overflow-y: auto; color: var(--text-sub); }
         .log-entry.err { color: var(--danger); }
     </style>
 </head>
 <body>
 
     <header>
-        <div class="logo">⚡ StreamVault HLS Pro</div>
+        <div class="logo">⚡ StreamVault</div>
         <div class="auth-bar">
-            <input type="text" id="destFolderId" placeholder="Destination Folder ID" style="width: 250px;">
-            <input type="password" id="vaultPassword" placeholder="Vault Password">
-            <button id="authBtn">Connect Google Drive</button>
+            <!-- STRICTLY IN RAM: Destroyed on tab close -->
+            <input type="password" id="vaultPassword" placeholder="AES-256 Vault Password" style="width: 200px;" autocomplete="off">
+            <button id="authBtn">Unlock & Connect</button>
         </div>
     </header>
 
     <div class="workspace">
         <aside class="sidebar">
             <div class="sidebar-header">
-                <span>ENCRYPTED VAULTS</span>
-                <span id="vaultCount">0 archives</span>
+                <span>LECTURE VAULTS</span>
+                <span id="vaultCount">0 items</span>
             </div>
             <ul class="file-list" id="fileList">
                 <li style="padding: 20px; text-align: center; color: var(--text-sub); font-size: 0.85rem;">
-                    Sign in to load your HLS archives.
+                    Sign in to load your encrypted archives.
                 </li>
             </ul>
         </aside>
@@ -108,43 +96,37 @@
             <div class="video-wrapper" id="videoWrapper">
                 <video id="vlcPlayer" playsinline></video>
 
-                <!-- VLC Pro Control Deck -->
                 <div class="player-deck" id="playerDeck">
-                    <!-- Scrubber Bar -->
                     <div class="timeline-container" id="timelineBar">
                         <div class="timeline-buffer" id="bufferBar"></div>
                         <div class="timeline-progress" id="progressBar"></div>
                     </div>
 
                     <div class="controls-row">
-                        <!-- Playback Controls -->
                         <div class="control-group">
                             <button class="ctrl-btn" id="playBtn" title="Play/Pause (Space)">▶</button>
                             <button class="ctrl-btn" id="stepBackBtn" title="Previous Frame (Shift+Left)">⏮</button>
-                            <button class="ctrl-btn" id="seekBack10" title="Back 10s (Left Arrow)">↺ 10s</button>
-                            <button class="ctrl-btn" id="seekFwd10" title="Forward 10s (Right Arrow)">10s ↻</button>
+                            <button class="ctrl-btn" id="seekBack5" title="Back 5s (Left Arrow)">↺ 5s</button>
+                            <button class="ctrl-btn" id="seekFwd5" title="Forward 5s (Right Arrow)">5s ↻</button>
                             <button class="ctrl-btn" id="stepFwdBtn" title="Next Frame (Shift+Right)">⏭</button>
                             <span class="time-label" id="timeDisplay" title="Click to toggle Remaining Time">00:00:00 / 00:00:00</span>
                         </div>
 
-                        <!-- Audio, Speed, Display Features -->
                         <div class="control-group">
-                            <!-- Volume & Boost -->
                             <div class="volume-box">
                                 <button class="ctrl-btn" id="muteBtn" title="Mute (M)">🔊</button>
                                 <input type="range" class="vol-slider" id="volSlider" min="0" max="2" step="0.05" value="1">
                                 <span class="boost-badge" id="volVal">100%</span>
                             </div>
 
-                            <!-- Speed Controller -->
                             <select class="deck-select" id="speedSelect" title="Playback Speed ([ / ])">
                                 <option value="0.5">0.50x</option>
                                 <option value="0.75">0.75x</option>
                                 <option value="1" selected>1.00x</option>
                                 <option value="1.25">1.25x</option>
                                 <option value="1.5">1.50x</option>
-                                <option value="1.75">1.75x</option>
                                 <option value="2">2.00x</option>
+                                <option value="3">3.00x</option>
                             </select>
 
                             <button class="ctrl-btn" id="pipBtn" title="Picture-in-Picture (P)">🗔</button>
@@ -158,349 +140,6 @@
         </main>
     </div>
 
-    <script>
-        // ====================================================================
-        // INITIALIZATION & STATE
-        // ====================================================================
-        const CLIENT_ID = '185170823583-t1g2t509cd1ogbhj9i9ctjb1rk9mpu8q.apps.googleusercontent.com'; 
-        let accessToken = null;
-        let hlsInstance = null;
-        let activeFileId = null;
-        let showRemainingTime = false;
-
-        const video = document.getElementById('vlcPlayer');
-        const logsOutput = document.getElementById('logsOutput');
-        const playBtn = document.getElementById('playBtn');
-        const progressBar = document.getElementById('progressBar');
-        const bufferBar = document.getElementById('bufferBar');
-        const timelineBar = document.getElementById('timelineBar');
-        const timeDisplay = document.getElementById('timeDisplay');
-        const volSlider = document.getElementById('volSlider');
-        const volVal = document.getElementById('volVal');
-        const muteBtn = document.getElementById('muteBtn');
-        const speedSelect = document.getElementById('speedSelect');
-
-        function appendLog(msg, isErr = false) {
-            const row = document.createElement('div');
-            row.className = `log-entry ${isErr ? 'err' : ''}`;
-            const time = new Date().toLocaleTimeString();
-            row.textContent = `[${time}] ${msg}`;
-            logsOutput.appendChild(row);
-            logsOutput.scrollTop = logsOutput.scrollHeight;
-        }
-
-        // Connect BroadcastChannel to display logs from the Service Worker
-        const logChannel = new BroadcastChannel('streamvault_logs');
-        logChannel.onmessage = (e) => appendLog(e.data.msg, e.data.isError);
-
-        // ====================================================================
-        // REGISTER SERVICE WORKER
-        // ====================================================================
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js')
-                .then(reg => appendLog('Service Worker engine registered.'))
-                .catch(err => appendLog(`SW Registration failed: ${err.message}`, true));
-        }
-
-        // ====================================================================
-        // WEB AUDIO API: 200% VLC AUDIO BOOSTER
-        // ====================================================================
-        let audioCtx = null;
-        let gainNode = null;
-
-        function initAudioBooster() {
-            if (audioCtx) return;
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            audioCtx = new AudioContext();
-            const source = audioCtx.createMediaElementSource(video);
-            gainNode = audioCtx.createGain();
-            gainNode.gain.value = 1.0;
-            source.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            appendLog('Web Audio Engine online (Supports up to 200% Boost).');
-        }
-
-        volSlider.addEventListener('input', (e) => {
-            initAudioBooster();
-            const val = parseFloat(e.target.value);
-            if (gainNode) gainNode.gain.value = val;
-            const pct = Math.round(val * 100);
-            volVal.textContent = `${pct}%`;
-            muteBtn.textContent = val === 0 ? '🔇' : (val > 1 ? '🔊' : '🔉');
-        });
-
-        // ====================================================================
-        // GOOGLE AUTHENTICATION & DRIVE SCANNER
-        // ====================================================================
-        let tokenClient;
-        window.onload = () => {
-            tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: 'https://www.googleapis.com/auth/drive.readonly',
-                callback: async (resp) => {
-                    if (resp.error) return appendLog(`Auth Failed: ${resp.error}`, true);
-                    accessToken = resp.access_token;
-                    appendLog('Google Auth Token synchronized.');
-
-                    // Sync token to Service Worker
-                    if (navigator.serviceWorker.controller) {
-                        navigator.serviceWorker.controller.postMessage({
-                            type: 'SYNC_TOKEN',
-                            token: accessToken
-                        });
-                    }
-
-                    await scanDriveFolder();
-                }
-            });
-        };
-
-        document.getElementById('authBtn').addEventListener('click', () => {
-            tokenClient.requestAccessToken({ prompt: 'consent' });
-        });
-
-        async function scanDriveFolder() {
-            const folderInput = document.getElementById('destFolderId').value.trim();
-            const match = folderInput.match(/[-\w]{25,}/);
-            const folderId = match ? match[0] : folderInput;
-
-            appendLog(`Scanning destination folder [${folderId}] for _HLS_Z.zip archives...`);
-            const fileListEl = document.getElementById('fileList');
-            fileListEl.innerHTML = '';
-
-            try {
-                let query = `mimeType != 'application/vnd.google-apps.folder' and trashed = false and name contains '_HLS_Z.zip'`;
-                if (folderId) query += ` and '${folderId}' in parents`;
-
-                const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,size)&pageSize=200`, {
-                    headers: { 'Authorization': `Bearer ${accessToken}` }
-                });
-                const data = await res.json();
-                const files = data.files || [];
-
-                document.getElementById('vaultCount').textContent = `${files.length} archives`;
-
-                if (files.length === 0) {
-                    fileListEl.innerHTML = `<li style="padding: 20px; text-align: center; color: var(--text-sub);">No _HLS_Z.zip files found.</li>`;
-                    return;
-                }
-
-                files.forEach(file => {
-                    const cleanTitle = file.name.replace('_HLS_Z.zip', '');
-                    const li = document.createElement('li');
-                    li.className = 'file-item';
-                    li.innerHTML = `
-                        <div class="title">${cleanTitle}</div>
-                        <div class="folder">${(file.size / (1024*1024)).toFixed(1)} MB • AES-256</div>
-                    `;
-                    li.onclick = () => loadHlsStream(file.id, cleanTitle, li);
-                    fileListEl.appendChild(li);
-                });
-
-            } catch (err) {
-                appendLog(`Drive scan failed: ${err.message}`, true);
-            }
-        }
-
-        // ====================================================================
-        // HLS.JS STREAM ENGINE (Zero RAM Spikes, 4-Second Micro-Chunks)
-        // ====================================================================
-        function loadHlsStream(fileId, title, listItem) {
-            const password = document.getElementById('vaultPassword').value;
-            if (!password) {
-                alert('Please enter your vault password at the top bar first.');
-                return;
-            }
-
-            document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
-            listItem.classList.add('active');
-            activeFileId = fileId;
-
-            // Notify SW of the active vault's password
-            navigator.serviceWorker.controller.postMessage({
-                type: 'UNLOCK',
-                fileId: fileId,
-                password: password
-            });
-
-            if (hlsInstance) {
-                hlsInstance.destroy();
-            }
-
-            appendLog(`Mounting HLS stream: ${title}...`);
-            const playlistUrl = `/stream-vault/${fileId}/master.m3u8`;
-
-            if (Hls.isSupported()) {
-                hlsInstance = new Hls({
-                    maxBufferLength: 20,       // Keep 20 seconds ahead in RAM (~10 MB)
-                    maxMaxBufferLength: 40,    // Hard memory ceiling
-                    enableWorker: false,       // Single-core battery preservation
-                    lowLatencyMode: false
-                });
-
-                hlsInstance.loadSource(playlistUrl);
-                hlsInstance.attachMedia(video);
-
-                hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-                    appendLog('HLS Manifest parsed. Ready for playback.');
-                    video.play().catch(() => {});
-                });
-
-                hlsInstance.on(Hls.Events.ERROR, (event, data) => {
-                    if (data.fatal) {
-                        appendLog(`Fatal HLS Error: ${data.details}`, true);
-                    }
-                });
-
-            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                // Native Safari engine
-                video.src = playlistUrl;
-                video.play();
-            }
-        }
-
-        // ====================================================================
-        // VLC-GRADE TIMELINE & BUTTON FEATURES
-        // ====================================================================
-        function formatTime(secs) {
-            if (isNaN(secs)) return '00:00:00';
-            const h = Math.floor(secs / 3600);
-            const m = Math.floor((secs % 3600) / 60);
-            const s = Math.floor(secs % 60);
-            const pad = (n) => n.toString().padStart(2, '0');
-            return `${pad(h)}:${pad(m)}:${pad(s)}`;
-        }
-
-        // Toggle Play/Pause
-        function togglePlay() {
-            initAudioBooster();
-            if (video.paused) {
-                video.play();
-                playBtn.textContent = '⏸';
-            } else {
-                video.pause();
-                playBtn.textContent = '▶';
-            }
-        }
-        playBtn.addEventListener('click', togglePlay);
-        video.addEventListener('click', togglePlay);
-        video.addEventListener('play', () => playBtn.textContent = '⏸');
-        video.addEventListener('pause', () => playBtn.textContent = '▶');
-
-        // Timeline Updates & Buffer Rendering
-        video.addEventListener('timeupdate', () => {
-            const current = video.currentTime;
-            const duration = video.duration || 0;
-            const pct = (current / duration) * 100;
-            progressBar.style.width = `${pct}%`;
-
-            // Buffer representation
-            if (video.buffered.length > 0) {
-                const bufferedEnd = video.buffered.end(video.buffered.length - 1);
-                bufferBar.style.width = `${(bufferedEnd / duration) * 100}%`;
-            }
-
-            if (showRemainingTime) {
-                const rem = duration - current;
-                timeDisplay.textContent = `-${formatTime(rem)} / ${formatTime(duration)}`;
-            } else {
-                timeDisplay.textContent = `${formatTime(current)} / ${formatTime(duration)}`;
-            }
-        });
-
-        timeDisplay.addEventListener('click', () => {
-            showRemainingTime = !showRemainingTime;
-        });
-
-        // Instant Timeline Scrubbing
-        timelineBar.addEventListener('click', (e) => {
-            const rect = timelineBar.getBoundingClientRect();
-            const clickX = e.clientX - rect.left;
-            const targetPct = clickX / rect.width;
-            video.currentTime = targetPct * video.duration;
-        });
-
-        // Skips & Micro-Stepping
-        document.getElementById('seekBack10').onclick = () => video.currentTime = Math.max(0, video.currentTime - 10);
-        document.getElementById('seekFwd10').onclick = () => video.currentTime = Math.min(video.duration, video.currentTime + 10);
-        document.getElementById('stepBackBtn').onclick = () => { video.pause(); video.currentTime = Math.max(0, video.currentTime - 0.04); };
-        document.getElementById('stepFwdBtn').onclick = () => { video.pause(); video.currentTime = Math.min(video.duration, video.currentTime + 0.04); };
-
-        // Speed Dropdown
-        speedSelect.addEventListener('change', (e) => {
-            video.playbackRate = parseFloat(e.target.value);
-        });
-
-        // Picture-in-Picture & Fullscreen
-        document.getElementById('pipBtn').onclick = async () => {
-            if (document.pictureInPictureElement) {
-                await document.exitPictureInPicture();
-            } else {
-                await video.requestPictureInPicture();
-            }
-        };
-
-        document.getElementById('fullBtn').onclick = () => {
-            const wrapper = document.getElementById('videoWrapper');
-            if (!document.fullscreenElement) {
-                wrapper.requestFullscreen().catch(() => {});
-            } else {
-                document.exitFullscreen().catch(() => {});
-            }
-        };
-
-        // ====================================================================
-        // FULL VLC KEYBOARD SHORTCUTS ENGINE
-        // ====================================================================
-        window.addEventListener('keydown', (e) => {
-            // Prevent interference when typing into inputs
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-
-            switch(e.code) {
-                case 'Space':
-                    e.preventDefault();
-                    togglePlay();
-                    break;
-                case 'ArrowLeft':
-                    e.preventDefault();
-                    if (e.shiftKey) video.currentTime = Math.max(0, video.currentTime - 1); // 1s micro-seek
-                    else video.currentTime = Math.max(0, video.currentTime - 5);           // 5s standard seek
-                    break;
-                case 'ArrowRight':
-                    e.preventDefault();
-                    if (e.shiftKey) video.currentTime = Math.min(video.duration, video.currentTime + 1);
-                    else video.currentTime = Math.min(video.duration, video.currentTime + 5);
-                    break;
-                case 'ArrowUp':
-                    e.preventDefault();
-                    volSlider.value = Math.min(2.0, parseFloat(volSlider.value) + 0.05);
-                    volSlider.dispatchEvent(new Event('input'));
-                    break;
-                case 'ArrowDown':
-                    e.preventDefault();
-                    volSlider.value = Math.max(0.0, parseFloat(volSlider.value) - 0.05);
-                    volSlider.dispatchEvent(new Event('input'));
-                    break;
-                case 'KeyF':
-                    document.getElementById('fullBtn').click();
-                    break;
-                case 'KeyM':
-                    video.muted = !video.muted;
-                    muteBtn.textContent = video.muted ? '🔇' : '🔊';
-                    break;
-                case 'KeyP':
-                    document.getElementById('pipBtn').click();
-                    break;
-                case 'BracketRight':
-                    video.playbackRate = Math.min(3.0, video.playbackRate + 0.25);
-                    speedSelect.value = video.playbackRate.toString();
-                    break;
-                case 'BracketLeft':
-                    video.playbackRate = Math.max(0.25, video.playbackRate - 0.25);
-                    speedSelect.value = video.playbackRate.toString();
-                    break;
-            }
-        });
-    </script>
+    <script src="app.js"></script>
 </body>
 </html>
