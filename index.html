@@ -3,66 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vault Stream Player</title>
+    <title>Vault Stream</title>
+    <!-- Tailwind CSS for modern, instant styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 0; }
-        .header { background: #1e293b; padding: 16px 28px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
-        .header h2 { margin: 0; font-size: 1.25rem; font-weight: 600; }
-        #status-text { font-size: 0.875rem; color: #94a3b8; }
-        
-        #login-screen { display: flex; height: 40vh; justify-content: center; align-items: center; }
-        #auth-btn { background: #2563eb; color: #fff; border: none; padding: 14px 28px; font-size: 1rem; font-weight: 600; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
-        #auth-btn:hover { background: #1d4ed8; }
-        #auth-btn:disabled { background: #475569; cursor: not-allowed; }
-
-        #drive-ui { display: none; padding: 24px 28px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-top: 16px; }
-        .file-card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 16px; cursor: pointer; transition: border-color 0.2s, transform 0.1s; }
-        .file-card:hover { border-color: #3b82f6; transform: translateY(-2px); }
-        .file-card strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.95rem; margin-bottom: 6px; }
-        .file-card small { color: #94a3b8; font-size: 0.8rem; }
-
-        /* VIDEO MODAL */
-        #video-modal { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); justify-content: center; align-items: center; z-index: 1000; flex-direction: column; padding: 20px; }
-        .modal-content { background: #0f172a; border: 1px solid #334155; border-radius: 12px; width: 100%; max-width: 900px; overflow: hidden; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid #334155; }
-        .modal-header h3 { margin: 0; font-size: 1rem; color: #e2e8f0; max-width: 80%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        #close-modal { background: none; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer; line-height: 1; }
-        #close-modal:hover { color: #fff; }
-        #video-container { width: 100%; aspect-ratio: 16 / 9; background: #000; display: flex; align-items: center; justify-content: center; }
-
-        /* CONSOLE */
-        #debug-console { background: #020617; border: 1px solid #1e293b; color: #4ade80; padding: 14px; margin: 24px 28px; font-family: ui-monospace, Menlo, Monaco, Consolas, monospace; font-size: 0.8rem; height: 180px; overflow-y: auto; border-radius: 8px; }
+        /* Custom scrollbar for the terminal */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); }
     </style>
 </head>
-<body>
-    <div class="header">
-        <h2>📦 Vault Stream Player</h2>
-        <span id="status-text">Booting...</span>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <!-- Header -->
+    <header class="bg-slate-800 border-b border-slate-700 p-4 flex justify-between items-center shadow-lg">
+        <h2 class="text-xl font-bold flex items-center gap-2">
+            <i class="fa-solid fa-vault text-blue-500"></i> Vault Stream Player
+        </h2>
+        <span id="status-text" class="text-sm text-slate-400 font-medium">Booting...</span>
+    </header>
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="flex-grow flex justify-center items-center">
+        <button id="auth-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-lg font-bold shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2">
+            <i class="fa-brands fa-google"></i> Login with Google
+        </button>
     </div>
 
-    <div id="login-screen">
-        <button id="auth-btn">Login with Google</button>
-    </div>
-
-    <div id="drive-ui">
-        <h3 style="margin: 0; font-size: 1.1rem; color: #cbd5e1;">Available Archives</h3>
-        <div class="grid" id="file-grid"></div>
-    </div>
-
-    <div id="video-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="playing-title">Playing Video</h3>
-                <button id="close-modal">&times;</button>
-            </div>
-            <div id="video-container"></div>
+    <!-- Drive UI Grid -->
+    <div id="drive-ui" class="hidden p-6 max-w-7xl mx-auto w-full flex-grow">
+        <h3 class="text-lg font-semibold text-slate-300 mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-cloud"></i> Available Archives
+        </h3>
+        <div id="file-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <!-- Cards injected here -->
         </div>
     </div>
 
-    <div id="debug-console">
-        <div>[SYSTEM START] Ready for instructions...</div>
+    <!-- Loading Overlay (NEW) -->
+    <div id="loading-overlay" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-50 flex flex-col justify-center items-center">
+        <i class="fa-solid fa-circle-notch fa-spin text-5xl text-blue-500 mb-4"></i>
+        <h2 id="loading-text" class="text-xl font-bold text-white">Decrypting Engine...</h2>
+        <p class="text-slate-400 mt-2 text-sm">Please wait while the keys are derived.</p>
+    </div>
+
+    <!-- Password Modal -->
+    <div id="password-modal" class="hidden fixed inset-0 bg-black/80 z-40 flex justify-center items-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 class="text-lg font-bold mb-1"><i class="fa-solid fa-lock text-red-400 mr-2"></i>Encrypted Archive</h3>
+            <p id="target-file-label" class="text-xs text-slate-400 mb-4 break-all"></p>
+            <input type="password" id="archive-password" class="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white focus:outline-none focus:border-blue-500 mb-4" placeholder="Enter password...">
+            <div class="flex gap-2">
+                <button id="submit-password" class="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded font-bold transition-colors">Unlock</button>
+                <button id="cancel-password" class="flex-1 bg-slate-700 hover:bg-slate-600 py-2 rounded font-bold transition-colors">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Modal -->
+    <div id="video-modal" class="hidden fixed inset-0 bg-black/95 z-50 flex flex-col p-4 md:p-10">
+        <div class="flex justify-between items-center mb-4">
+            <h3 id="playing-title" class="text-lg font-bold truncate pr-4">Video</h3>
+            <button id="close-modal" class="text-slate-400 hover:text-white text-3xl leading-none">&times;</button>
+        </div>
+        <div id="video-container" class="w-full max-w-6xl mx-auto aspect-video bg-black rounded-lg overflow-hidden shadow-2xl flex items-center justify-center"></div>
+    </div>
+
+    <!-- Diagnostic Terminal -->
+    <div class="p-6">
+        <div id="debug-console" class="glass-panel border border-slate-700 rounded-lg p-4 font-mono text-xs h-40 overflow-y-auto">
+            <div class="text-green-400">[SYSTEM START] Terminal ready...</div>
+        </div>
     </div>
 
     <script src="./app.js"></script>
