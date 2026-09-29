@@ -5,89 +5,113 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StreamVault HLS Pro</title>
     
+    <!-- Core External Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     
     <style>
         :root {
-            --bg-main: #0d0f12;
-            --bg-card: #16191f;
+            --bg-main: #0a0c10;
+            --bg-card: #13171f;
+            --bg-hover: #1c222d;
             --accent: #ff8c00;
             --accent-hover: #ffa033;
             --text-main: #f0f3f6;
             --text-sub: #8b949e;
-            --border: #30363d;
+            --border: #262c36;
             --danger: #f85149;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; user-select: none; }
         body { background: var(--bg-main); color: var(--text-main); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
-        header { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
-        .logo { font-size: 1.15rem; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 8px; }
-        .auth-bar { display: flex; gap: 10px; align-items: center; }
-        input[type="password"] { background: #0b0c0e; border: 1px solid var(--border); color: #fff; padding: 7px 10px; border-radius: 6px; font-size: 0.85rem; outline: none; }
-        input[type="password"]:focus { border-color: var(--accent); }
-        button { background: var(--accent); color: #000; border: none; font-weight: 600; padding: 7px 16px; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 0.85rem; }
+        /* Top Header */
+        header { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 10px 18px; display: flex; justify-content: space-between; align-items: center; z-index: 20; }
+        .logo { font-size: 1.1rem; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 8px; letter-spacing: 0.5px; }
+        .auth-bar { display: flex; gap: 8px; align-items: center; }
+        input[type="password"], input[type="text"] { background: #07080a; border: 1px solid var(--border); color: #fff; padding: 7px 11px; border-radius: 5px; font-size: 0.85rem; outline: none; }
+        input[type="password"]:focus, input[type="text"]:focus { border-color: var(--accent); }
+        button { background: var(--accent); color: #000; border: none; font-weight: 600; padding: 7px 15px; border-radius: 5px; cursor: pointer; transition: background 0.15s; font-size: 0.82rem; }
         button:hover { background: var(--accent-hover); }
 
-        .workspace { display: flex; flex: 1; height: calc(100vh - 61px); overflow: hidden; }
-        .sidebar { width: 320px; background: var(--bg-card); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
-        .sidebar-header { padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 0.85rem; font-weight: 600; color: var(--text-sub); display: flex; justify-content: space-between; }
+        /* Workspace Grid */
+        .workspace { display: flex; flex: 1; height: calc(100vh - 53px); overflow: hidden; }
+
+        /* Sidebar & Search */
+        .sidebar { width: 330px; background: var(--bg-card); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+        .sidebar-search { padding: 10px; border-bottom: 1px solid var(--border); }
+        .sidebar-search input { width: 100%; }
+        .sidebar-header { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 0.78rem; font-weight: 600; color: var(--text-sub); display: flex; justify-content: space-between; }
         .file-list { flex: 1; overflow-y: auto; list-style: none; }
-        .file-item { padding: 12px 16px; border-bottom: 1px solid #1f242c; font-size: 0.88rem; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
-        .file-item:hover { background: #1c2128; }
-        .file-item.active { background: #262c36; border-left: 3px solid var(--accent); }
-        .file-item .title { font-weight: 500; word-break: break-word; }
-        .file-item .meta { font-size: 0.75rem; color: var(--text-sub); }
+        .file-item { padding: 11px 14px; border-bottom: 1px solid #181d26; font-size: 0.85rem; cursor: pointer; display: flex; flex-direction: column; gap: 3px; }
+        .file-item:hover { background: var(--bg-hover); }
+        .file-item.active { background: #1e2633; border-left: 3px solid var(--accent); }
+        .file-item .title { font-weight: 500; word-break: break-word; color: #fff; }
+        .file-item .meta { font-size: 0.72rem; color: var(--text-sub); }
 
-        .stage { flex: 1; display: flex; flex-direction: column; position: relative; background: #000; }
-        .video-wrapper { width: 100%; height: 100%; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        video { width: 100%; height: 100%; max-height: 100vh; outline: none; }
+        /* Stage */
+        .stage { flex: 1; display: flex; flex-direction: column; position: relative; background: #000; overflow: hidden; }
+        .video-wrapper { width: 100%; height: 100%; position: relative; display: flex; align-items: center; justify-content: center; background: #000; cursor: default; }
+        .video-wrapper.hide-cursor { cursor: none; }
+        video { width: 100%; height: 100%; max-height: 100vh; outline: none; object-fit: contain; }
 
-        .player-deck { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, rgba(10,10,12,0.95), transparent); padding: 20px 20px 12px; display: flex; flex-direction: column; gap: 10px; opacity: 0; transition: opacity 0.3s; z-index: 10; }
-        .video-wrapper:hover .player-deck, .player-deck.locked { opacity: 1; }
+        /* VLC On-Screen Display (OSD) */
+        .osd { position: absolute; top: 30px; right: 30px; background: rgba(0, 0, 0, 0.75); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 10px 18px; border-radius: 6px; font-size: 1rem; font-weight: 600; pointer-events: none; opacity: 0; transition: opacity 0.2s; z-index: 30; }
+        .osd.visible { opacity: 1; }
 
-        .timeline-container { position: relative; width: 100%; height: 6px; background: rgba(255, 255, 255, 0.2); border-radius: 3px; cursor: pointer; }
-        .timeline-buffer { position: absolute; height: 100%; background: rgba(255, 255, 255, 0.4); border-radius: 3px; width: 0%; }
-        .timeline-progress { position: absolute; height: 100%; background: var(--accent); border-radius: 3px; width: 0%; }
+        /* VLC Player Deck */
+        .player-deck { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 0.6) 70%, transparent); padding: 24px 20px 12px; display: flex; flex-direction: column; gap: 8px; opacity: 1; transition: opacity 0.3s ease; z-index: 10; }
+        .player-deck.fade-out { opacity: 0; pointer-events: none; }
 
+        /* Scrubbing Bar */
+        .timeline-container { position: relative; width: 100%; height: 6px; background: rgba(255, 255, 255, 0.2); border-radius: 3px; cursor: pointer; transition: height 0.15s; }
+        .timeline-container:hover { height: 9px; }
+        .timeline-buffer { position: absolute; height: 100%; background: rgba(255, 255, 255, 0.35); border-radius: 3px; width: 0%; }
+        .timeline-progress { position: absolute; height: 100%; background: var(--accent); border-radius: 3px; width: 0%; pointer-events: none; }
+
+        /* Controls Deck */
         .controls-row { display: flex; justify-content: space-between; align-items: center; }
-        .control-group { display: flex; align-items: center; gap: 6px; }
-        .ctrl-btn { background: none; border: none; color: #fff; font-size: 1.1rem; padding: 6px 10px; border-radius: 4px; cursor: pointer; }
-        .ctrl-btn:hover { background: rgba(255, 255, 255, 0.15); color: var(--accent); }
-        .time-label { font-size: 0.85rem; font-family: monospace; cursor: pointer; margin-left: 10px; }
-        
-        .volume-box { display: flex; align-items: center; gap: 8px; margin-left: 10px; }
-        .vol-slider { -webkit-appearance: none; width: 80px; height: 4px; background: #555; border-radius: 2px; cursor: pointer; }
-        .vol-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: var(--accent); border-radius: 50%; }
-        .boost-badge { font-size: 0.75rem; padding: 2px 5px; background: #262c36; color: var(--accent); border-radius: 3px; font-weight: bold; }
-        .deck-select { background: #1c2128; border: 1px solid var(--border); color: #fff; padding: 4px; font-size: 0.85rem; border-radius: 4px; outline: none; }
+        .control-group { display: flex; align-items: center; gap: 5px; }
+        .ctrl-btn { background: none; border: none; color: #fff; font-size: 1.05rem; padding: 6px 9px; border-radius: 4px; cursor: pointer; transition: 0.15s; }
+        .ctrl-btn:hover { background: rgba(255, 255, 255, 0.12); color: var(--accent); }
+        .time-label { font-size: 0.82rem; font-family: monospace; cursor: pointer; margin-left: 8px; color: #d0d7de; }
 
-        .logs-drawer { height: 130px; background: #08090b; border-top: 1px solid var(--border); padding: 10px 15px; font-family: monospace; font-size: 0.8rem; overflow-y: auto; color: var(--text-sub); }
+        /* Volume & Boost */
+        .volume-box { display: flex; align-items: center; gap: 6px; margin-left: 6px; }
+        .vol-slider { -webkit-appearance: none; width: 75px; height: 4px; background: #444; border-radius: 2px; cursor: pointer; }
+        .vol-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: var(--accent); border-radius: 50%; }
+        .boost-badge { font-size: 0.72rem; padding: 2px 5px; background: #1c222d; color: var(--accent); border-radius: 3px; font-weight: 700; min-width: 40px; text-align: center; }
+        .boost-badge.danger { color: var(--danger); }
+
+        .deck-select { background: #161b22; border: 1px solid var(--border); color: #fff; padding: 4px 6px; font-size: 0.8rem; border-radius: 4px; outline: none; cursor: pointer; }
+
+        /* Log Drawer */
+        .logs-drawer { height: 110px; background: #050608; border-top: 1px solid var(--border); padding: 8px 12px; font-family: monospace; font-size: 0.76rem; overflow-y: auto; color: var(--text-sub); }
         .log-entry.err { color: var(--danger); }
     </style>
 </head>
 <body>
 
     <header>
-        <div class="logo">⚡ StreamVault</div>
+        <div class="logo">⚡ StreamVault HLS Pro</div>
         <div class="auth-bar">
-            <!-- STRICTLY IN RAM: Destroyed on tab close -->
-            <input type="password" id="vaultPassword" placeholder="AES-256 Vault Password" style="width: 200px;" autocomplete="off">
+            <input type="password" id="vaultPassword" placeholder="AES-256 Vault Password" style="width: 230px;" autocomplete="off">
             <button id="authBtn">Unlock & Connect</button>
         </div>
     </header>
 
     <div class="workspace">
         <aside class="sidebar">
+            <div class="sidebar-search">
+                <input type="text" id="searchInput" placeholder="Filter lectures..." autocomplete="off">
+            </div>
             <div class="sidebar-header">
                 <span>LECTURE VAULTS</span>
                 <span id="vaultCount">0 items</span>
             </div>
             <ul class="file-list" id="fileList">
                 <li style="padding: 20px; text-align: center; color: var(--text-sub); font-size: 0.85rem;">
-                    Sign in to load your encrypted archives.
+                    Enter vault password and connect to begin.
                 </li>
             </ul>
         </aside>
@@ -95,14 +119,17 @@
         <main class="stage">
             <div class="video-wrapper" id="videoWrapper">
                 <video id="vlcPlayer" playsinline></video>
+                <div class="osd" id="osdDisplay"></div>
 
                 <div class="player-deck" id="playerDeck">
+                    <!-- Interactive Scrubber -->
                     <div class="timeline-container" id="timelineBar">
                         <div class="timeline-buffer" id="bufferBar"></div>
                         <div class="timeline-progress" id="progressBar"></div>
                     </div>
 
                     <div class="controls-row">
+                        <!-- Playback Controls -->
                         <div class="control-group">
                             <button class="ctrl-btn" id="playBtn" title="Play/Pause (Space)">▶</button>
                             <button class="ctrl-btn" id="stepBackBtn" title="Previous Frame (Shift+Left)">⏮</button>
@@ -112,6 +139,7 @@
                             <span class="time-label" id="timeDisplay" title="Click to toggle Remaining Time">00:00:00 / 00:00:00</span>
                         </div>
 
+                        <!-- Audio, Speed, View Controls -->
                         <div class="control-group">
                             <div class="volume-box">
                                 <button class="ctrl-btn" id="muteBtn" title="Mute (M)">🔊</button>
@@ -119,13 +147,17 @@
                                 <span class="boost-badge" id="volVal">100%</span>
                             </div>
 
+                            <button class="ctrl-btn" id="aspectBtn" title="Aspect Ratio (A)" style="font-size:0.8rem; font-weight:700;">FIT</button>
+
                             <select class="deck-select" id="speedSelect" title="Playback Speed ([ / ])">
                                 <option value="0.5">0.50x</option>
                                 <option value="0.75">0.75x</option>
                                 <option value="1" selected>1.00x</option>
                                 <option value="1.25">1.25x</option>
                                 <option value="1.5">1.50x</option>
+                                <option value="1.75">1.75x</option>
                                 <option value="2">2.00x</option>
+                                <option value="2.5">2.50x</option>
                                 <option value="3">3.00x</option>
                             </select>
 
@@ -140,6 +172,329 @@
         </main>
     </div>
 
-    <script src="app.js"></script>
+    <!-- Embedded Engine -->
+    <script>
+        const GOOGLE_CLIENT_ID = '185170823583-t1g2t509cd1ogbhj9i9ctjb1rk9mpu8q.apps.googleusercontent.com';
+        const TARGET_DRIVE_FOLDER = '1bTzbHZ9hcnR9oL38Ue76Q_XzK-JU7g7r';
+
+        const video = document.getElementById('vlcPlayer');
+        const videoWrapper = document.getElementById('videoWrapper');
+        const playerDeck = document.getElementById('playerDeck');
+        const osd = document.getElementById('osdDisplay');
+        const logsOutput = document.getElementById('logsOutput');
+        const searchInput = document.getElementById('searchInput');
+
+        let accessToken = null;
+        let hlsInstance = null;
+        let cachedFiles = [];
+        let osdTimeout = null;
+        let idleTimer = null;
+
+        // Logging Pipe
+        function appendLog(msg, isErr = false) {
+            const row = document.createElement('div');
+            row.className = `log-entry ${isErr ? 'err' : ''}`;
+            row.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logsOutput.appendChild(row);
+            logsOutput.scrollTop = logsOutput.scrollHeight;
+        }
+
+        const logChannel = new BroadcastChannel('streamvault_logs');
+        logChannel.onmessage = (e) => appendLog(e.data.msg, e.data.isError);
+
+        // Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(() => appendLog('Service Worker Engine online.'))
+                .catch(err => appendLog(`SW Registration failed: ${err.message}`, true));
+        }
+
+        // VLC On-Screen Display (OSD)
+        function showOSD(text) {
+            osd.textContent = text;
+            osd.classList.add('visible');
+            clearTimeout(osdTimeout);
+            osdTimeout = setTimeout(() => osd.classList.remove('visible'), 1200);
+        }
+
+        // Auto-Hide Controls on Mouse Idle
+        function resetIdleTimer() {
+            playerDeck.classList.remove('fade-out');
+            videoWrapper.classList.remove('hide-cursor');
+            clearTimeout(idleTimer);
+            if (!video.paused) {
+                idleTimer = setTimeout(() => {
+                    playerDeck.classList.add('fade-out');
+                    videoWrapper.classList.add('hide-cursor');
+                }, 2500);
+            }
+        }
+        videoWrapper.addEventListener('mousemove', resetIdleTimer);
+        video.addEventListener('play', resetIdleTimer);
+        video.addEventListener('pause', () => {
+            playerDeck.classList.remove('fade-out');
+            videoWrapper.classList.remove('hide-cursor');
+            clearTimeout(idleTimer);
+        });
+
+        // Google Auth & Vault Listing
+        let tokenClient;
+        document.getElementById('authBtn').addEventListener('click', () => {
+            const password = document.getElementById('vaultPassword').value;
+            if (!password) return alert('Enter your AES-256 Vault Password first.');
+
+            try {
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: GOOGLE_CLIENT_ID,
+                    scope: 'https://www.googleapis.com/auth/drive.readonly',
+                    callback: async (resp) => {
+                        if (resp.error) return appendLog(`Auth Failed: ${resp.error}`, true);
+                        accessToken = resp.access_token;
+                        appendLog('Google Auth Token synchronized (RAM only).');
+
+                        if (navigator.serviceWorker.controller) {
+                            navigator.serviceWorker.controller.postMessage({ type: 'SYNC_TOKEN', token: accessToken });
+                        }
+                        await scanDriveFolder();
+                    }
+                });
+                tokenClient.requestAccessToken({ prompt: 'consent' });
+            } catch (err) {
+                appendLog(`OAuth Error: ${err.message}`, true);
+            }
+        });
+
+        async function scanDriveFolder() {
+            appendLog('Scanning Drive for HLS Vaults...');
+            try {
+                const query = `mimeType != 'application/vnd.google-apps.folder' and trashed = false and name contains '_HLS_Z.zip' and '${TARGET_DRIVE_FOLDER}' in parents`;
+                const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,size)&pageSize=200`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error.message);
+
+                cachedFiles = data.files || [];
+                renderFileList(cachedFiles);
+            } catch (err) {
+                appendLog(`Drive Scan Failed: ${err.message}`, true);
+            }
+        }
+
+        function renderFileList(files) {
+            const fileListEl = document.getElementById('fileList');
+            fileListEl.innerHTML = '';
+            document.getElementById('vaultCount').textContent = `${files.length} items`;
+
+            if (files.length === 0) {
+                fileListEl.innerHTML = `<li style="padding: 20px; color: var(--text-sub); font-size: 0.82rem;">No matching vaults found.</li>`;
+                return;
+            }
+
+            files.forEach(file => {
+                const cleanTitle = file.name.replace('_HLS_Z.zip', '');
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                li.innerHTML = `<div class="title">${cleanTitle}</div><div class="meta">${(file.size / 1048576).toFixed(1)} MB • AES-256 Vault</div>`;
+                li.onclick = () => loadHlsStream(file.id, cleanTitle, li);
+                fileListEl.appendChild(li);
+            });
+        }
+
+        // Live Search Filter
+        searchInput.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            const filtered = cachedFiles.filter(f => f.name.toLowerCase().includes(term));
+            renderFileList(filtered);
+        });
+
+        // HLS Loader
+        function loadHlsStream(fileId, title, listItem) {
+            const password = document.getElementById('vaultPassword').value;
+            if (!password) return alert('Enter your AES-256 Vault Password at the top.');
+
+            document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
+            listItem.classList.add('active');
+
+            navigator.serviceWorker.controller.postMessage({ type: 'UNLOCK', fileId, password });
+
+            if (hlsInstance) hlsInstance.destroy();
+            appendLog(`Mounting HLS stream: ${title}...`);
+            showOSD(`Loading: ${title}`);
+            
+            const playlistUrl = `/stream-vault/${fileId}/master.m3u8`;
+
+            if (Hls.isSupported()) {
+                hlsInstance = new Hls({
+                    maxBufferLength: 15,
+                    maxMaxBufferLength: 30,
+                    enableWorker: false
+                });
+
+                hlsInstance.loadSource(playlistUrl);
+                hlsInstance.attachMedia(video);
+
+                hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+                    appendLog('Vault unlocked. Stream ready.');
+                    initAudioBooster();
+                    video.play().catch(() => {});
+                });
+
+                hlsInstance.on(Hls.Events.ERROR, (e, data) => {
+                    if (data.fatal) appendLog(`HLS Error: ${data.details}`, true);
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = playlistUrl;
+                video.play();
+            }
+        }
+
+        // Web Audio API Booster (Up to 200%)
+        let audioCtx, gainNode;
+        function initAudioBooster() {
+            if (audioCtx) return;
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return;
+            audioCtx = new AudioContext();
+            const source = audioCtx.createMediaElementSource(video);
+            gainNode = audioCtx.createGain();
+            source.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+        }
+
+        const volSlider = document.getElementById('volSlider');
+        const volVal = document.getElementById('volVal');
+        const muteBtn = document.getElementById('muteBtn');
+
+        function setVolume(val) {
+            initAudioBooster();
+            val = Math.max(0, Math.min(2.0, val));
+            volSlider.value = val;
+            if (gainNode) gainNode.gain.value = val;
+            const pct = Math.round(val * 100);
+            volVal.textContent = `${pct}%`;
+            volVal.classList.toggle('danger', pct > 150);
+            muteBtn.textContent = val === 0 ? '🔇' : (val > 1 ? '🔊' : '🔉');
+            showOSD(`Volume: ${pct}%`);
+        }
+
+        volSlider.addEventListener('input', (e) => setVolume(parseFloat(e.target.value)));
+        muteBtn.onclick = () => {
+            video.muted = !video.muted;
+            muteBtn.textContent = video.muted ? '🔇' : (parseFloat(volSlider.value) > 1 ? '🔊' : '🔉');
+            showOSD(video.muted ? 'Muted' : `Volume: ${Math.round(volSlider.value * 100)}%`);
+        };
+
+        // Aspect Ratio Toggle (Fit -> Fill -> Stretch)
+        const aspectBtn = document.getElementById('aspectBtn');
+        const aspectModes = ['contain', 'cover', 'fill'];
+        const aspectLabels = ['FIT', 'ZOOM', 'STRETCH'];
+        let currentAspectIdx = 0;
+
+        function cycleAspectRatio() {
+            currentAspectIdx = (currentAspectIdx + 1) % aspectModes.length;
+            video.style.objectFit = aspectModes[currentAspectIdx];
+            aspectBtn.textContent = aspectLabels[currentAspectIdx];
+            showOSD(`Aspect: ${aspectLabels[currentAspectIdx]}`);
+        }
+        aspectBtn.onclick = cycleAspectRatio;
+
+        // Play/Pause
+        const playBtn = document.getElementById('playBtn');
+        function togglePlay() {
+            initAudioBooster();
+            if (video.paused) {
+                video.play();
+                showOSD('Play');
+            } else {
+                video.pause();
+                showOSD('Pause');
+            }
+        }
+        playBtn.onclick = togglePlay;
+        video.onclick = togglePlay;
+        video.onplay = () => playBtn.textContent = '⏸';
+        video.onpause = () => playBtn.textContent = '▶';
+
+        // Time & Draggable Scrubber
+        let showRemaining = false;
+        let isScrubbing = false;
+        const timeDisplay = document.getElementById('timeDisplay');
+        const timelineBar = document.getElementById('timelineBar');
+        const progressBar = document.getElementById('progressBar');
+        const bufferBar = document.getElementById('bufferBar');
+
+        timeDisplay.onclick = () => showRemaining = !showRemaining;
+        const fmt = (s) => isNaN(s) ? '00:00:00' : new Date(s * 1000).toISOString().substr(11, 8);
+
+        video.addEventListener('timeupdate', () => {
+            if (isScrubbing) return;
+            const cur = video.currentTime;
+            const dur = video.duration || 0;
+            progressBar.style.width = `${(cur / dur) * 100}%`;
+
+            if (video.buffered.length > 0) {
+                bufferBar.style.width = `${(video.buffered.end(video.buffered.length - 1) / dur) * 100}%`;
+            }
+
+            timeDisplay.textContent = showRemaining 
+                ? `-${fmt(dur - cur)} / ${fmt(dur)}` 
+                : `${fmt(cur)} / ${fmt(dur)}`;
+        });
+
+        function seekFromEvent(e) {
+            const rect = timelineBar.getBoundingClientRect();
+            const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            progressBar.style.width = `${pos * 100}%`;
+            video.currentTime = pos * video.duration;
+        }
+
+        timelineBar.addEventListener('mousedown', (e) => {
+            isScrubbing = true;
+            seekFromEvent(e);
+        });
+        window.addEventListener('mousemove', (e) => { if (isScrubbing) seekFromEvent(e); });
+        window.addEventListener('mouseup', () => { isScrubbing = false; });
+
+        // Skip / Micro-step
+        function seekRelative(secs) {
+            video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + secs));
+            showOSD(`${secs > 0 ? '+' : ''}${secs}s`);
+        }
+        document.getElementById('seekBack5').onclick = () => seekRelative(-5);
+        document.getElementById('seekFwd5').onclick = () => seekRelative(5);
+        document.getElementById('stepBackBtn').onclick = () => { video.pause(); video.currentTime -= 0.04; showOSD('-1 Frame'); };
+        document.getElementById('stepFwdBtn').onclick = () => { video.pause(); video.currentTime += 0.04; showOSD('+1 Frame'); };
+
+        // Speed & Display Controls
+        const speedSelect = document.getElementById('speedSelect');
+        function setSpeed(rate) {
+            video.playbackRate = rate;
+            speedSelect.value = rate.toString();
+            showOSD(`Speed: ${rate.toFixed(2)}x`);
+        }
+        speedSelect.onchange = (e) => setSpeed(parseFloat(e.target.value));
+
+        document.getElementById('pipBtn').onclick = () => document.pictureInPictureElement ? document.exitPictureInPicture() : video.requestPictureInPicture();
+        document.getElementById('fullBtn').onclick = () => document.fullscreenElement ? document.exitFullscreen() : videoWrapper.requestFullscreen();
+
+        // VLC Keyboard Shortcuts
+        window.addEventListener('keydown', (e) => {
+            if (['INPUT', 'SELECT'].includes(e.target.tagName)) return;
+            switch(e.code) {
+                case 'Space': e.preventDefault(); togglePlay(); break;
+                case 'ArrowLeft': e.preventDefault(); seekRelative(e.shiftKey ? -1 : -5); break;
+                case 'ArrowRight': e.preventDefault(); seekRelative(e.shiftKey ? 1 : 5); break;
+                case 'ArrowUp': e.preventDefault(); setVolume(parseFloat(volSlider.value) + 0.05); break;
+                case 'ArrowDown': e.preventDefault(); setVolume(parseFloat(volSlider.value) - 0.05); break;
+                case 'KeyF': document.getElementById('fullBtn').click(); break;
+                case 'KeyM': muteBtn.click(); break;
+                case 'KeyP': document.getElementById('pipBtn').click(); break;
+                case 'KeyA': cycleAspectRatio(); break;
+                case 'BracketRight': setSpeed(Math.min(3.0, video.playbackRate + 0.25)); break;
+                case 'BracketLeft': setSpeed(Math.max(0.25, video.playbackRate - 0.25)); break;
+            }
+        });
+    </script>
 </body>
 </html>
