@@ -52,15 +52,33 @@ async function streamDecryptedVideo(fileId) {
     }
 
     try {
-        sysLog("Connecting to Google Drive API...");
+        sysLog("Resolving Google Drive redirect to bypass CORS restrictions...");
         
-        // CRITICAL FIX 1: acknowledgeAbuse=true bypasses Google's 403 large-file scan block.
-        const driveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&acknowledgeAbuse=true`;
+        // 1. PRE-RESOLUTION: We fetch the URL without Range headers so the browser happily follows the redirect.
+        const initialUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&acknowledgeAbuse=true`;
+        const abortCtrl = new AbortController();
         
-        const reader = new zip.HttpRangeReader(driveUrl, {
+        const initialRes = await fetch(initialUrl, {
+            headers: { 'Authorization': `Bearer ${authToken}` },
+            signal: abortCtrl.signal
+        });
+
+        if (!initialRes.ok) {
+            throw new Error(`Google API blocked the request: ${initialRes.status}`);
+        }
+
+        // 2. We capture the final direct URL to the hidden media server!
+        const finalStreamUrl = initialRes.url;
+        
+        // 3. Instantly abort the download so it doesn't eat your RAM.
+        abortCtrl.abort();
+        
+        sysLog("Redirect resolved. Initializing direct Range Reader...");
+
+        // 4. Give the final direct URL to the ZIP engine. No more redirects!
+        const reader = new zip.HttpRangeReader(finalStreamUrl, {
             useXHR: false,
             preventHeadRequest: true,
-            // CRITICAL FIX 2: Keep the token in the Headers so Firefox doesn't block the Range Request.
             httpHeaders: { 'Authorization': `Bearer ${authToken}` }
         });
 
@@ -80,7 +98,6 @@ async function streamDecryptedVideo(fileId) {
 
         sysLog(`Found Video: ${videoEntry.filename} (${(videoEntry.uncompressedSize/1024/1024).toFixed(1)} MB)`);
         
-        // Set correct MIME type so the HTML5 player accepts it
         const ext = videoEntry.filename.split('.').pop().toLowerCase();
         let mimeType = 'video/mp4';
         if (ext === 'mkv') mimeType = 'video/webm';
