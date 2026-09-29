@@ -1,83 +1,71 @@
 importScripts('https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.29/dist/zip.min.js');
 
-// 1. CRITICAL FIX: Stop zip.js from crashing by disabling sub-workers inside the SW
+// Critical: Prevents crashes on Chrome by keeping math on the main SW thread
 zip.configure({ useWebWorkers: false });
 
-let vaultToken = null;
-const unlockedFiles = new Map();
+let authToken = null;
+const activeVaults = new Map();
 
-self.addEventListener('install', (event) => self.skipWaiting());
-self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+self.addEventListener('install', (e) => self.skipWaiting());
+self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
-self.addEventListener('message', (event) => {
-    if (event.data?.type === 'INIT_VAULT') vaultToken = event.data.token;
-    if (event.data?.type === 'UNLOCK_FILE') {
-        unlockedFiles.set(event.data.fileId, { password: event.data.password });
-    }
+self.addEventListener('message', (e) => {
+    if (e.data.type === 'SYNC_TOKEN') authToken = e.data.token;
+    if (e.data.type === 'UNLOCK') activeVaults.set(e.data.fileId, e.data.password);
 });
 
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
-    if (url.pathname.includes('/vault-stream/')) {
-        event.respondWith(handleZipStream(event.request, url));
+    if (url.pathname.includes('/stream-vault/')) {
+        event.respondWith(streamDecryptedMP4(url.pathname.split('/').pop()));
     }
 });
 
-async function handleZipStream(request, url) {
-    if (!vaultToken) return new Response("ERR: Drive token missing.", { status: 401 });
-
-    const fileId = url.pathname.split('/').pop();
-    const vaultData = unlockedFiles.get(fileId);
-    if (!vaultData) return new Response("ERR: Vault locked.", { status: 403 });
+async function streamDecryptedMP4(fileId) {
+    if (!authToken) return new Response("No token", { status: 401 });
+    
+    const password = activeVaults.get(fileId);
+    if (!password) return new Response("No password", { status: 403 });
 
     try {
-        const driveStreamUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
-        
-        const reader = new zip.HttpRangeReader(driveStreamUrl, {
+        const driveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+        const reader = new zip.HttpRangeReader(driveUrl, {
             useXHR: false,
             preventHeadRequest: true,
-            httpHeaders: { 'Authorization': `Bearer ${vaultToken}` }
+            httpHeaders: { 'Authorization': `Bearer ${authToken}` }
         });
 
         const zipReader = new zip.ZipReader(reader);
         const entries = await zipReader.getEntries();
 
-        const videoEntry = entries.find(e => e.filename.match(/\.(mp4|m4v|mkv)$/i));
-        if (!videoEntry) {
+        // STRICT MP4 SEARCH ONLY
+        const mp4Entry = entries.find(e => e.filename.toLowerCase().endsWith('.mp4'));
+        if (!mp4Entry) {
             await zipReader.close();
-            return new Response("ERR: No video found.", { status: 404 });
+            return new Response("No MP4 found inside ZIP", { status: 404 });
         }
 
-        let mimeType = 'video/mp4';
-        if (videoEntry.filename.toLowerCase().endsWith('.mkv')) mimeType = 'video/webm';
-
-        // 2. CRITICAL FIX: Extract the exact file size so the <video> tag accepts the stream
-        const fileSize = videoEntry.uncompressedSize;
-
+        const fileSize = mp4Entry.uncompressedSize;
         const { readable, writable } = new TransformStream();
         const streamWriter = new zip.WritableStreamWriter(writable);
 
-        // Start AES-256 decryption
-        videoEntry.getData(streamWriter, { password: vaultData.password })
+        // Start Decryption Pipe
+        mp4Entry.getData(streamWriter, { password: password })
             .then(() => zipReader.close())
-            .catch(err => {
-                // 3. CRITICAL FIX: Log password failures directly to the console
-                console.error("[DECRYPT_CRASH] Decryption failed! Check your password.", err);
-            });
+            .catch(err => console.error("[Decryption Failed]", err));
 
-        // 4. CRITICAL FIX: Feed strict headers to force the browser to play the live pipe
         return new Response(readable, {
             status: 200,
             headers: {
-                'Content-Type': mimeType,
+                'Content-Type': 'video/mp4',
                 'Content-Length': fileSize.toString(),
-                'Accept-Ranges': 'none', // Forces the browser to stream sequentially
+                'Accept-Ranges': 'none',
                 'Cache-Control': 'no-store'
             }
         });
 
     } catch (err) {
-        console.error("[FATAL_SW_ERROR]", err);
-        return new Response(`ERR: ${err.message}`, { status: 500 });
+        console.error("[SW Error]", err);
+        return new Response(err.message, { status: 500 });
     }
 }
