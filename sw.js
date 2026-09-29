@@ -54,14 +54,14 @@ async function streamDecryptedVideo(fileId) {
     try {
         sysLog("Connecting to Google Drive API...");
         
-        // CRITICAL FIX: Embed the auth token directly into the URL to survive Google's redirects.
-        // Also added acknowledgeAbuse=true to bypass Google Drive's large-file virus scan blocks.
-        const driveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&acknowledgeAbuse=true&access_token=${authToken}`;
+        // CRITICAL FIX 1: acknowledgeAbuse=true bypasses Google's 403 large-file scan block.
+        const driveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&acknowledgeAbuse=true`;
         
         const reader = new zip.HttpRangeReader(driveUrl, {
             useXHR: false,
-            preventHeadRequest: true
-            // Authorization header is removed here because it is now safely in the URL
+            preventHeadRequest: true,
+            // CRITICAL FIX 2: Keep the token in the Headers so Firefox doesn't block the Range Request.
+            httpHeaders: { 'Authorization': `Bearer ${authToken}` }
         });
 
         sysLog("Reading ZIP Central Directory...");
@@ -70,7 +70,6 @@ async function streamDecryptedVideo(fileId) {
 
         sysLog(`Found ${entries.length} files in archive. Searching for Video...`);
         
-        // CRITICAL FIX: Expanded to catch .m4v and .mkv since your file is an M4V!
         const videoEntry = entries.find(e => e.filename.match(/\.(mp4|m4v|mkv)$/i));
         
         if (!videoEntry) {
