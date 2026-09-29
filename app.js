@@ -13,7 +13,6 @@ const UI = {
 let tokenClient;
 let driveToken = '';
 
-// --- TERMINAL LOGGER ---
 function sysLog(msg, isError = false) {
     const time = new Date().toLocaleTimeString();
     const color = isError ? 'text-red-500 font-bold' : 'text-green-400';
@@ -21,11 +20,9 @@ function sysLog(msg, isError = false) {
     UI.term.scrollTop = UI.term.scrollHeight;
 }
 
-// Listen to the Service Worker via Broadcast Channel
 const logChannel = new BroadcastChannel('streamvault_logs');
 logChannel.onmessage = (e) => sysLog(`[SW Engine] ${e.data.msg}`, e.data.isError);
 
-// --- BOOT SEQUENCE ---
 window.onload = async () => {
     sysLog("App started. Registering Service Worker...");
     try {
@@ -53,13 +50,11 @@ window.onload = async () => {
             }
             checks++;
         }, 100);
-
     } catch (err) {
         sysLog(`Boot Error: ${err.message}`, true);
     }
 };
 
-// --- GOOGLE LOGIN SYSTEM ---
 function initLoginSystem() {
     UI.status.innerText = "Ready.";
     
@@ -90,7 +85,6 @@ function initLoginSystem() {
     });
 }
 
-// --- FILE MANAGER ---
 async function fetchFiles() {
     sysLog("Scanning Google Drive for encrypted .zip files...");
     UI.list.innerHTML = '';
@@ -108,8 +102,13 @@ async function fetchFiles() {
 
         data.files.forEach(file => {
             const btn = document.createElement('button');
-            btn.className = "p-4 bg-slate-800 hover:bg-slate-700 rounded text-left border border-slate-600 transition-colors";
-            btn.innerHTML = `<strong class="block truncate">${file.name}</strong>`;
+            btn.className = "p-4 bg-slate-800 hover:bg-slate-700 rounded text-left border border-slate-600 transition-colors flex flex-col justify-between";
+            
+            // UI FIX: Replaced "truncate" with "break-words" so long names wrap perfectly!
+            btn.innerHTML = `
+                <strong class="block text-sm break-words leading-snug mb-2 text-slate-100">${file.name}</strong>
+                <span class="text-xs font-bold text-blue-400 bg-blue-900/30 px-2 py-1 rounded w-fit">Click to Unlock</span>
+            `;
             
             btn.onclick = () => {
                 const pass = prompt(`Enter AES-256 password for:\n${file.name}`);
@@ -124,7 +123,6 @@ async function fetchFiles() {
     }
 }
 
-// --- START STREAM ---
 function startDecryption(file, password) {
     sysLog(`Preparing to unlock ${file.name}...`);
     
