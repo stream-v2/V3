@@ -3,8 +3,13 @@ importScripts('https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.29/dist/zip.min.j
 let vaultToken = null;
 const unlockedFiles = new Map();
 
-self.addEventListener('install', (event) => event.waitUntil(self.skipWaiting()));
-self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+// FORCE UPDATE: Nuke old broken service workers immediately
+self.addEventListener('install', (event) => {
+    self.skipWaiting();
+});
+self.addEventListener('activate', (event) => {
+    event.waitUntil(self.clients.claim());
+});
 
 self.addEventListener('message', (event) => {
     if (event.data?.type === 'INIT_VAULT') vaultToken = event.data.token;
@@ -30,7 +35,6 @@ async function handleZipStream(request, url) {
     try {
         const driveStreamUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
         
-        // zip.js connects to Drive using HTTP Range Requests
         const reader = new zip.HttpRangeReader(driveStreamUrl, {
             useXHR: false,
             preventHeadRequest: true,
@@ -40,23 +44,19 @@ async function handleZipStream(request, url) {
         const zipReader = new zip.ZipReader(reader);
         const entries = await zipReader.getEntries();
 
-        // Target the video file inside the ZIP
         const videoEntry = entries.find(e => e.filename.match(/\.(mp4|m4v|mkv)$/i));
         if (!videoEntry) {
             await zipReader.close();
             return new Response("No video found in archive.", { status: 404 });
         }
 
-        // CREATE A LIVE PIPE: No RAM buffering.
         const { readable, writable } = new TransformStream();
         const streamWriter = new zip.WritableStreamWriter(writable);
 
-        // Start decryption in the background asynchronously 
         videoEntry.getData(streamWriter, { password: vaultData.password })
             .then(() => zipReader.close())
             .catch(err => console.error("[SW] AES Decryption stream failed:", err));
 
-        // Return the readable end of the pipe immediately to the HTML <video> tag
         return new Response(readable, {
             status: 200,
             headers: {
