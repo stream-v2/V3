@@ -46,7 +46,6 @@
         .file-item { padding: 11px 14px; border-bottom: 1px solid #181d26; font-size: 0.85rem; cursor: pointer; display: flex; flex-direction: column; gap: 3px; }
         .file-item:hover { background: var(--bg-hover); }
         .file-item.active { background: #1e2633; border-left: 3px solid var(--accent); }
-        .file-item .folder-badge { font-size: 0.68rem; color: var(--accent); background: rgba(255, 140, 0, 0.1); padding: 2px 6px; border-radius: 3px; display: inline-block; width: fit-content; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .file-item .title { font-weight: 500; word-break: break-word; color: #fff; line-height: 1.3; }
         .file-item .meta { font-size: 0.72rem; color: var(--text-sub); }
 
@@ -100,6 +99,7 @@
     <header>
         <div class="logo">⚡ StreamVault HLS Pro</div>
         <div class="auth-bar">
+            <!-- STRICTLY IN RAM: Destroyed on tab close -->
             <input type="password" id="vaultPassword" placeholder="AES-256 Vault Password" style="width: 230px;" autocomplete="off">
             <button id="authBtn">Unlock & Connect</button>
         </div>
@@ -108,7 +108,7 @@
     <div class="workspace">
         <aside class="sidebar">
             <div class="sidebar-search">
-                <input type="text" id="searchInput" placeholder="Filter lectures or folders..." autocomplete="off">
+                <input type="text" id="searchInput" placeholder="Filter lectures..." autocomplete="off">
             </div>
             <div class="sidebar-header">
                 <span>LECTURE VAULTS</span>
@@ -187,7 +187,6 @@
     <!-- Embedded Engine -->
     <script>
         const GOOGLE_CLIENT_ID = '185170823583-t1g2t509cd1ogbhj9i9ctjb1rk9mpu8q.apps.googleusercontent.com';
-        const TARGET_DRIVE_FOLDER = '1bTzbHZ9hcnR9oL38Ue76Q_XzK-JU7g7r';
 
         const video = document.getElementById('vlcPlayer');
         const videoWrapper = document.getElementById('videoWrapper');
@@ -221,7 +220,7 @@
                 .join('\n');
             if (!logsText) return showOSD('No logs to copy');
             navigator.clipboard.writeText(logsText).then(() => {
-                showOSD('Logs Copied to Clipboard!');
+                showOSD('Logs Copied!');
             }).catch(() => {
                 const ta = document.createElement('textarea');
                 ta.value = logsText;
@@ -229,7 +228,7 @@
                 ta.select();
                 document.execCommand('copy');
                 document.body.removeChild(ta);
-                showOSD('Logs Copied to Clipboard!');
+                showOSD('Logs Copied!');
             });
         };
 
@@ -272,7 +271,7 @@
             clearTimeout(idleTimer);
         });
 
-        // Google Auth & Recursive Vault Listing
+        // Google Auth & Vault Listing (Global Signature Search)
         let tokenClient;
         document.getElementById('authBtn').addEventListener('click', () => {
             const password = document.getElementById('vaultPassword').value;
@@ -299,75 +298,29 @@
             }
         });
 
-        // Recursive Subfolder Scanner
+        // Lightning Fast Global Search
         async function scanDriveFolder() {
-            appendLog('Starting recursive scan of destination folder tree...');
+            appendLog('Running Global Signature Search for HLS Vaults...');
             const fileListEl = document.getElementById('fileList');
-            fileListEl.innerHTML = '<li style="padding: 20px; text-align: center; color: var(--text-sub);">Crawling directory tree...</li>';
+            fileListEl.innerHTML = '<li style="padding: 20px; text-align: center; color: var(--text-sub);">Searching Drive...</li>';
 
             try {
-                // Step 1: Map all nested subfolders
-                const folderPaths = new Map();
-                folderPaths.set(TARGET_DRIVE_FOLDER, "");
-                const folderQueue = [TARGET_DRIVE_FOLDER];
-
-                while (folderQueue.length > 0) {
-                    const currentId = folderQueue.shift();
-                    const currentPath = folderPaths.get(currentId);
-
-                    let pageToken = null;
-                    do {
-                        const q = `'${currentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-                        const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=nextPageToken,files(id,name)&pageSize=1000${pageToken ? `&pageToken=${pageToken}` : ''}`, {
-                            headers: { 'Authorization': `Bearer ${accessToken}` }
-                        });
-                        const data = await res.json();
-                        if (data.error) throw new Error(data.error.message);
-
-                        for (const folder of (data.files || [])) {
-                            const subPath = currentPath ? `${currentPath} / ${folder.name}` : folder.name;
-                            folderPaths.set(folder.id, subPath);
-                            folderQueue.push(folder.id);
-                        }
-                        pageToken = data.nextPageToken;
-                    } while (pageToken);
-                }
-
-                appendLog(`Indexed ${folderPaths.size} folders. Fetching all _HLS_Z.zip archives...`);
-
-                // Step 2: Query all _HLS_Z.zip archives
-                let allFiles = [];
-                let filePageToken = null;
-                do {
-                    const query = `mimeType != 'application/vnd.google-apps.folder' and trashed = false and name contains '_HLS_Z.zip'`;
-                    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=nextPageToken,files(id,name,size,parents)&pageSize=500${filePageToken ? `&pageToken=${filePageToken}` : ''}`, {
-                        headers: { 'Authorization': `Bearer ${accessToken}` }
-                    });
-                    const data = await res.json();
-                    if (data.error) throw new Error(data.error.message);
-
-                    allFiles.push(...(data.files || []));
-                    filePageToken = data.nextPageToken;
-                } while (filePageToken);
-
-                // Step 3: Match files that reside inside the folder tree
-                const targetFiles = allFiles.filter(f => f.parents && f.parents.some(p => folderPaths.has(p)));
+                // One single query bypassing folders entirely: Find anything ending in _HLS_Z.zip
+                const query = `name contains '_HLS_Z.zip' and trashed = false`;
+                const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,size)&pageSize=1000`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                const data = await res.json();
                 
-                targetFiles.forEach(f => {
-                    const parentId = f.parents.find(p => folderPaths.has(p));
-                    f.folderPath = folderPaths.get(parentId) || "Root";
-                });
-
-                // Sort alphabetically by Folder Path, then Lecture Name
-                targetFiles.sort((a, b) => {
-                    const pathCmp = a.folderPath.localeCompare(b.folderPath);
-                    if (pathCmp !== 0) return pathCmp;
-                    return a.name.localeCompare(b.name);
-                });
-
-                cachedFiles = targetFiles;
+                if (data.error) throw new Error(data.error.message);
+                
+                cachedFiles = data.files || [];
+                
+                // Sort alphabetically by name
+                cachedFiles.sort((a, b) => a.name.localeCompare(b.name));
+                
                 renderFileList(cachedFiles);
-                appendLog(`Scan complete. Found ${targetFiles.length} archives across ${folderPaths.size} folders.`);
+                appendLog(`Search complete. Found ${cachedFiles.length} archives across your Drive.`);
 
             } catch (err) {
                 appendLog(`Drive Scan Failed: ${err.message}`, true);
@@ -389,7 +342,6 @@
                 const li = document.createElement('li');
                 li.className = 'file-item';
                 li.innerHTML = `
-                    ${file.folderPath ? `<span class="folder-badge" title="${file.folderPath}">📁 ${file.folderPath}</span>` : ''}
                     <div class="title">${cleanTitle}</div>
                     <div class="meta">${(file.size / 1048576).toFixed(1)} MB • AES-256 Vault</div>
                 `;
@@ -398,13 +350,10 @@
             });
         }
 
-        // Live Search Filter (searches both title and folder path)
+        // Live Search Filter
         searchInput.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
-            const filtered = cachedFiles.filter(f => 
-                f.name.toLowerCase().includes(term) || 
-                (f.folderPath && f.folderPath.toLowerCase().includes(term))
-            );
+            const filtered = cachedFiles.filter(f => f.name.toLowerCase().includes(term));
             renderFileList(filtered);
         });
 
