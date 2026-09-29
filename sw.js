@@ -54,7 +54,7 @@ async function streamDecryptedVideo(fileId) {
     try {
         sysLog("Resolving Google Drive redirect to bypass CORS restrictions...");
         
-        // 1. PRE-RESOLUTION: We fetch the URL without Range headers so the browser happily follows the redirect.
+        // 1. Fetch the initial Drive API URL to trigger the redirect
         const initialUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&acknowledgeAbuse=true`;
         const abortCtrl = new AbortController();
         
@@ -67,19 +67,19 @@ async function streamDecryptedVideo(fileId) {
             throw new Error(`Google API blocked the request: ${initialRes.status}`);
         }
 
-        // 2. We capture the final direct URL to the hidden media server!
+        // 2. Capture the final direct URL from Google's media servers
         const finalStreamUrl = initialRes.url;
         
-        // 3. Instantly abort the download so it doesn't eat your RAM.
+        // 3. Abort the dummy fetch so it doesn't download the whole file into RAM
         abortCtrl.abort();
         
         sysLog("Redirect resolved. Initializing direct Range Reader...");
 
-        // 4. Give the final direct URL to the ZIP engine. No more redirects!
+        // 4. Feed the signed URL to the ZIP engine. 
+        // CRITICAL FIX: No Auth headers are sent here. The URL is already signed by Google!
         const reader = new zip.HttpRangeReader(finalStreamUrl, {
             useXHR: false,
-            preventHeadRequest: true,
-            httpHeaders: { 'Authorization': `Bearer ${authToken}` }
+            preventHeadRequest: true
         });
 
         sysLog("Reading ZIP Central Directory...");
