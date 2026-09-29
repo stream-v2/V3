@@ -35,11 +35,11 @@ self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
     if (url.pathname.includes('/stream-vault/')) {
         sysLog(`Intercepted stream request for Drive File ID: ${url.pathname.split('/').pop()}`);
-        event.respondWith(streamDecryptedMP4(url.pathname.split('/').pop()));
+        event.respondWith(streamDecryptedVideo(url.pathname.split('/').pop()));
     }
 });
 
-async function streamDecryptedMP4(fileId) {
+async function streamDecryptedVideo(fileId) {
     if (!authToken) {
         sysLog("Fetch aborted: No Google auth token.", true);
         return new Response("No token", { status: 401 });
@@ -53,35 +53,47 @@ async function streamDecryptedMP4(fileId) {
 
     try {
         sysLog("Connecting to Google Drive API...");
-        const driveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+        
+        // CRITICAL FIX: Embed the auth token directly into the URL to survive Google's redirects.
+        // Also added acknowledgeAbuse=true to bypass Google Drive's large-file virus scan blocks.
+        const driveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&acknowledgeAbuse=true&access_token=${authToken}`;
+        
         const reader = new zip.HttpRangeReader(driveUrl, {
             useXHR: false,
-            preventHeadRequest: true,
-            httpHeaders: { 'Authorization': `Bearer ${authToken}` }
+            preventHeadRequest: true
+            // Authorization header is removed here because it is now safely in the URL
         });
 
         sysLog("Reading ZIP Central Directory...");
         const zipReader = new zip.ZipReader(reader);
         const entries = await zipReader.getEntries();
 
-        sysLog(`Found ${entries.length} files in archive. Searching for MP4...`);
-        const mp4Entry = entries.find(e => e.filename.toLowerCase().endsWith('.mp4'));
+        sysLog(`Found ${entries.length} files in archive. Searching for Video...`);
         
-        if (!mp4Entry) {
-            sysLog("No MP4 file found inside the ZIP!", true);
+        // CRITICAL FIX: Expanded to catch .m4v and .mkv since your file is an M4V!
+        const videoEntry = entries.find(e => e.filename.match(/\.(mp4|m4v|mkv)$/i));
+        
+        if (!videoEntry) {
+            sysLog("No video file found inside the ZIP!", true);
             await zipReader.close();
-            return new Response("No MP4 found", { status: 404 });
+            return new Response("No video found", { status: 404 });
         }
 
-        sysLog(`Found MP4: ${mp4Entry.filename} (${(mp4Entry.uncompressedSize/1024/1024).toFixed(1)} MB)`);
+        sysLog(`Found Video: ${videoEntry.filename} (${(videoEntry.uncompressedSize/1024/1024).toFixed(1)} MB)`);
         
-        const fileSize = mp4Entry.uncompressedSize;
+        // Set correct MIME type so the HTML5 player accepts it
+        const ext = videoEntry.filename.split('.').pop().toLowerCase();
+        let mimeType = 'video/mp4';
+        if (ext === 'mkv') mimeType = 'video/webm';
+        if (ext === 'm4v') mimeType = 'video/x-m4v';
+
+        const fileSize = videoEntry.uncompressedSize;
         const { readable, writable } = new TransformStream();
         const streamWriter = new zip.WritableStreamWriter(writable);
 
         sysLog("Igniting AES-256 decryption pipe...");
         
-        mp4Entry.getData(streamWriter, { password: password })
+        videoEntry.getData(streamWriter, { password: password })
             .then(() => {
                 sysLog("Decryption stream successfully finished.");
                 zipReader.close();
@@ -94,7 +106,7 @@ async function streamDecryptedMP4(fileId) {
         return new Response(readable, {
             status: 200,
             headers: {
-                'Content-Type': 'video/mp4',
+                'Content-Type': mimeType,
                 'Content-Length': fileSize.toString(),
                 'Accept-Ranges': 'none',
                 'Cache-Control': 'no-store'
