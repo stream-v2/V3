@@ -1,5 +1,8 @@
 importScripts('https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.29/dist/zip.min.js');
 
+// 1. CRITICAL FIX: Stop zip.js from crashing by disabling sub-workers inside the SW
+zip.configure({ useWebWorkers: false });
+
 let vaultToken = null;
 const unlockedFiles = new Map();
 
@@ -21,11 +24,11 @@ self.addEventListener('fetch', (event) => {
 });
 
 async function handleZipStream(request, url) {
-    if (!vaultToken) return new Response("ERR_SW_AUTH: Drive token missing.", { status: 401 });
+    if (!vaultToken) return new Response("ERR: Drive token missing.", { status: 401 });
 
     const fileId = url.pathname.split('/').pop();
     const vaultData = unlockedFiles.get(fileId);
-    if (!vaultData) return new Response("ERR_SW_LOCK: Vault locked. Provide password.", { status: 403 });
+    if (!vaultData) return new Response("ERR: Vault locked.", { status: 403 });
 
     try {
         const driveStreamUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
@@ -42,31 +45,39 @@ async function handleZipStream(request, url) {
         const videoEntry = entries.find(e => e.filename.match(/\.(mp4|m4v|mkv)$/i));
         if (!videoEntry) {
             await zipReader.close();
-            return new Response("ERR_SW_NO_VIDEO: No video found in archive.", { status: 404 });
+            return new Response("ERR: No video found.", { status: 404 });
         }
 
-        // --- DYNAMIC MIME TYPE DETECTOR ---
-        let mimeType = 'video/mp4'; // Default to MP4
-        const ext = videoEntry.filename.split('.').pop().toLowerCase();
-        if (ext === 'mkv') mimeType = 'video/webm'; // Browsers handle MKV best when disguised as WebM
-        if (ext === 'm4v') mimeType = 'video/x-m4v';
+        let mimeType = 'video/mp4';
+        if (videoEntry.filename.toLowerCase().endsWith('.mkv')) mimeType = 'video/webm';
+
+        // 2. CRITICAL FIX: Extract the exact file size so the <video> tag accepts the stream
+        const fileSize = videoEntry.uncompressedSize;
 
         const { readable, writable } = new TransformStream();
         const streamWriter = new zip.WritableStreamWriter(writable);
 
+        // Start AES-256 decryption
         videoEntry.getData(streamWriter, { password: vaultData.password })
             .then(() => zipReader.close())
-            .catch(err => console.error("[ERR_SW_DECRYPT] AES Decryption stream failed:", err));
+            .catch(err => {
+                // 3. CRITICAL FIX: Log password failures directly to the console
+                console.error("[DECRYPT_CRASH] Decryption failed! Check your password.", err);
+            });
 
+        // 4. CRITICAL FIX: Feed strict headers to force the browser to play the live pipe
         return new Response(readable, {
             status: 200,
             headers: {
                 'Content-Type': mimeType,
+                'Content-Length': fileSize.toString(),
+                'Accept-Ranges': 'none', // Forces the browser to stream sequentially
                 'Cache-Control': 'no-store'
             }
         });
 
     } catch (err) {
-        return new Response(`ERR_SW_FATAL: ${err.message}`, { status: 500 });
+        console.error("[FATAL_SW_ERROR]", err);
+        return new Response(`ERR: ${err.message}`, { status: 500 });
     }
 }
