@@ -1,4 +1,4 @@
-const CLIENT_ID = '185170823583-t1g2t509cd1ogbhj9i9ctjb1rk9mpu8q.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = '185170823583-t1g2t509cd1ogbhj9i9ctjb1rk9mpu8q.apps.googleusercontent.com';
 
 const TARGET_DRIVE_FOLDER = '1bTzbHZ9hcnR9oL38Ue76Q_XzK-JU7g7r';
 const video = document.getElementById('vlcPlayer');
