@@ -4,16 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StreamVault | Secure AES-256 Player</title>
-    <!-- Tailwind CSS for Advanced UI -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- zip.js Engine -->
     <script src="https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.29/dist/zip.min.js"></script>
+    <!-- CRITICAL FIX: The onload parameter ensures the app only starts when Google is actually ready -->
+    <script src="https://accounts.google.com/gsi/client" async defer onload="initApp()"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen flex flex-col">
 
-    <!-- Navbar -->
     <header class="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
             <div class="flex items-center gap-3">
@@ -26,10 +24,9 @@
         </div>
     </header>
 
-    <!-- Main Content -->
     <main class="flex-grow max-w-7xl mx-auto px-4 py-8 w-full">
         
-        <!-- Video Player Section (Hidden by default) -->
+        <!-- Video Player Section -->
         <div id="playerContainer" class="hidden mb-12 animate-fade-in">
             <div class="relative bg-black rounded-2xl overflow-hidden shadow-2xl aspect-video border border-slate-700">
                 <video id="videoPlayer" class="w-full h-full object-contain" controls controlsList="nodownload"></video>
@@ -37,20 +34,18 @@
             </div>
         </div>
 
-        <!-- Library Grid -->
         <div class="mb-6 flex justify-between items-end">
             <h2 class="text-2xl font-bold">Secure Library</h2>
-            <span id="statusText" class="text-sm text-slate-400">Waiting for authentication...</span>
+            <!-- ERRORS WILL PRINT HERE -->
+            <span id="statusText" class="text-sm text-slate-400 font-mono">Loading Google Scripts...</span>
         </div>
         
-        <div id="fileGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <!-- Video Cards Inject Here -->
-        </div>
+        <div id="fileGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
     </main>
 
-    <!-- AES Password Modal -->
+    <!-- Password Modal -->
     <div id="passwordModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
-        <div class="bg-slate-800 border border-slate-700 p-8 rounded-2xl shadow-2xl w-full max-w-md transform scale-95 transition-all">
+        <div class="bg-slate-800 border border-slate-700 p-8 rounded-2xl shadow-2xl w-full max-w-md">
             <div class="flex items-center justify-center w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 mb-4 mx-auto">
                 <i class="fa-solid fa-lock text-xl"></i>
             </div>
@@ -59,15 +54,10 @@
             
             <form id="unlockForm" class="flex flex-col gap-4">
                 <input type="password" id="archivePassword" placeholder="AES-256 Passphrase" required
-                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all">
-                
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 focus:outline-none focus:border-blue-500">
                 <div class="flex gap-3 mt-2">
-                    <button type="button" id="cancelUnlock" class="flex-1 py-3 px-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-medium transition-colors">
-                        Cancel
-                    </button>
-                    <button type="submit" class="flex-1 py-3 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-medium transition-colors shadow-lg shadow-blue-500/20">
-                        Decrypt & Play
-                    </button>
+                    <button type="button" id="cancelUnlock" class="flex-1 py-3 px-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-medium">Cancel</button>
+                    <button type="submit" class="flex-1 py-3 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-medium shadow-lg shadow-blue-500/20">Decrypt & Play</button>
                 </div>
             </form>
         </div>
