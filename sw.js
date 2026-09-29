@@ -45,6 +45,12 @@ async function handleZipStream(request, url) {
             return new Response("ERR_SW_NO_VIDEO: No video found in archive.", { status: 404 });
         }
 
+        // --- DYNAMIC MIME TYPE DETECTOR ---
+        let mimeType = 'video/mp4'; // Default to MP4
+        const ext = videoEntry.filename.split('.').pop().toLowerCase();
+        if (ext === 'mkv') mimeType = 'video/webm'; // Browsers handle MKV best when disguised as WebM
+        if (ext === 'm4v') mimeType = 'video/x-m4v';
+
         const { readable, writable } = new TransformStream();
         const streamWriter = new zip.WritableStreamWriter(writable);
 
@@ -55,7 +61,7 @@ async function handleZipStream(request, url) {
         return new Response(readable, {
             status: 200,
             headers: {
-                'Content-Type': 'video/mp4',
+                'Content-Type': mimeType,
                 'Cache-Control': 'no-store'
             }
         });
