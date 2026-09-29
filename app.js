@@ -1,65 +1,83 @@
 const CLIENT_ID = '185170823583-t1g2t509cd1ogbhj9i9ctjb1rk9mpu8q.apps.googleusercontent.com';
+
 const UI = {
     btn: document.getElementById('authBtn'),
     status: document.getElementById('statusBox'),
     list: document.getElementById('fileList'),
     playerWrap: document.getElementById('playerWrapper'),
     video: document.getElementById('videoPlayer'),
-    title: document.getElementById('videoTitle')
+    title: document.getElementById('videoTitle'),
+    term: document.getElementById('debugTerminal')
 };
 
 let tokenClient;
 let driveToken = '';
 
+// --- TERMINAL LOGGER ---
+function sysLog(msg, isError = false) {
+    const time = new Date().toLocaleTimeString();
+    const color = isError ? 'text-red-500 font-bold' : 'text-green-400';
+    UI.term.innerHTML += `<div class="${color}">[${time}] ${msg}</div>`;
+    UI.term.scrollTop = UI.term.scrollHeight;
+}
+
+// Listen to the Service Worker via Broadcast Channel
+const logChannel = new BroadcastChannel('streamvault_logs');
+logChannel.onmessage = (e) => sysLog(`[SW Engine] ${e.data.msg}`, e.data.isError);
+
 // --- BOOT SEQUENCE ---
 window.onload = async () => {
-    UI.status.innerText = "Registering Decryption Engine (sw.js)...";
-    
+    sysLog("App started. Registering Service Worker...");
     try {
-        // 1. Boot Service Worker
         if ('serviceWorker' in navigator) {
             await navigator.serviceWorker.register('sw.js');
             await navigator.serviceWorker.ready;
+            sysLog("Service worker registered successfully.");
+            
             if (!navigator.serviceWorker.controller) {
-                window.location.reload(); // Force SW takeover
+                sysLog("Forcing Service Worker takeover. Reloading...");
+                window.location.reload(); 
             }
         }
 
-        // 2. Wait for Google Script to load
+        sysLog("Waiting for Google Identity script...");
         let checks = 0;
         const waitForGoogle = setInterval(() => {
             if (typeof google !== 'undefined') {
                 clearInterval(waitForGoogle);
+                sysLog("Google API loaded. Login System Ready.");
                 initLoginSystem();
             } else if (checks > 20) {
                 clearInterval(waitForGoogle);
-                UI.status.innerHTML = "<span class='text-red-500'>Google Auth failed to load. Turn off Adblocker.</span>";
+                sysLog("Google Auth failed to load. Check Adblocker.", true);
             }
             checks++;
         }, 100);
 
     } catch (err) {
-        UI.status.innerHTML = `<span class="text-red-500">Boot Error: ${err.message}</span>`;
+        sysLog(`Boot Error: ${err.message}`, true);
     }
 };
 
-// --- LOGIN SYSTEM ---
+// --- GOOGLE LOGIN SYSTEM ---
 function initLoginSystem() {
-    UI.status.innerText = "Engine ready. Click 'Connect Google Drive'.";
+    UI.status.innerText = "Ready.";
     
     tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: CLIENT_ID,
         scope: 'https://www.googleapis.com/auth/drive.readonly',
         callback: (response) => {
             if (response.error) {
-                UI.status.innerText = `Login failed: ${response.error}`;
+                sysLog(`Google Login failed: ${response.error}`, true);
                 return;
             }
             driveToken = response.access_token;
+            sysLog("Google Auth Token received.");
+            
             UI.btn.innerText = "Connected";
             UI.btn.classList.replace('bg-blue-600', 'bg-green-600');
             
-            // Send token to Service Worker
+            sysLog("Syncing token to Decryption Engine...");
             navigator.serviceWorker.controller.postMessage({ type: 'SYNC_TOKEN', token: driveToken });
             
             fetchFiles();
@@ -67,13 +85,14 @@ function initLoginSystem() {
     });
 
     UI.btn.addEventListener('click', () => {
+        sysLog("Requesting Google Login prompt...");
         tokenClient.requestAccessToken({ prompt: 'consent' });
     });
 }
 
 // --- FILE MANAGER ---
 async function fetchFiles() {
-    UI.status.innerText = "Scanning Drive for .zip files...";
+    sysLog("Scanning Google Drive for encrypted .zip files...");
     UI.list.innerHTML = '';
 
     try {
@@ -82,20 +101,15 @@ async function fetchFiles() {
             headers: { 'Authorization': `Bearer ${driveToken}` }
         });
 
-        if (!res.ok) throw new Error("API Request Failed");
+        if (!res.ok) throw new Error(`Google API responded with status ${res.status}`);
         const data = await res.json();
 
-        if (data.files.length === 0) {
-            UI.status.innerText = "No .zip files found in your Google Drive.";
-            return;
-        }
-
-        UI.status.innerText = `Found ${data.files.length} encrypted archives.`;
+        sysLog(`Found ${data.files.length} encrypted archives in your Drive.`);
 
         data.files.forEach(file => {
             const btn = document.createElement('button');
             btn.className = "p-4 bg-slate-800 hover:bg-slate-700 rounded text-left border border-slate-600 transition-colors";
-            btn.innerHTML = `<strong class="block truncate">${file.name}</strong><span class="text-xs text-slate-400">Click to unlock</span>`;
+            btn.innerHTML = `<strong class="block truncate">${file.name}</strong>`;
             
             btn.onclick = () => {
                 const pass = prompt(`Enter AES-256 password for:\n${file.name}`);
@@ -106,26 +120,26 @@ async function fetchFiles() {
         });
 
     } catch (err) {
-        UI.status.innerHTML = `<span class="text-red-500">Scan Error: ${err.message}</span>`;
+        sysLog(`Drive Scan Error: ${err.message}`, true);
     }
 }
 
 // --- START STREAM ---
 function startDecryption(file, password) {
-    // Send password to SW
+    sysLog(`Preparing to unlock ${file.name}...`);
+    
     navigator.serviceWorker.controller.postMessage({ 
         type: 'UNLOCK', 
         fileId: file.id, 
         password: password 
     });
 
-    // Setup Video Player
-    UI.title.innerText = `Decrypting: ${file.name}`;
+    UI.title.innerText = file.name;
     UI.playerWrap.classList.remove('hidden');
     
-    // Connect video to the SW stream interceptor
+    sysLog("Attaching stream to Video Player...");
     UI.video.src = `/stream-vault/${file.id}`;
-    UI.video.play().catch(e => console.log("Press play manually."));
     
-    window.scrollTo(0, 0);
+    UI.video.onerror = () => sysLog("HTML5 Video Player refused the stream.", true);
+    UI.video.onplaying = () => sysLog("VIDEO IS PLAYING SUCCESSFULLY!");
 }
