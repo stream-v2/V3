@@ -22,31 +22,32 @@
             --danger: #f85149;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; user-select: none; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background: var(--bg-main); color: var(--text-main); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
         /* Top Header */
-        header { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 10px 18px; display: flex; justify-content: space-between; align-items: center; z-index: 20; }
+        header { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 10px 18px; display: flex; justify-content: space-between; align-items: center; z-index: 20; user-select: none; }
         .logo { font-size: 1.1rem; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 8px; letter-spacing: 0.5px; }
         .auth-bar { display: flex; gap: 8px; align-items: center; }
         input[type="password"], input[type="text"] { background: #07080a; border: 1px solid var(--border); color: #fff; padding: 7px 11px; border-radius: 5px; font-size: 0.85rem; outline: none; }
         input[type="password"]:focus, input[type="text"]:focus { border-color: var(--accent); }
-        button { background: var(--accent); color: #000; border: none; font-weight: 600; padding: 7px 15px; border-radius: 5px; cursor: pointer; transition: background 0.15s; font-size: 0.82rem; }
+        button { background: var(--accent); color: #000; border: none; font-weight: 600; padding: 7px 15px; border-radius: 5px; cursor: pointer; transition: background 0.15s; font-size: 0.82rem; user-select: none; }
         button:hover { background: var(--accent-hover); }
 
         /* Workspace Grid */
         .workspace { display: flex; flex: 1; height: calc(100vh - 53px); overflow: hidden; }
 
         /* Sidebar & Search */
-        .sidebar { width: 330px; background: var(--bg-card); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+        .sidebar { width: 340px; background: var(--bg-card); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
         .sidebar-search { padding: 10px; border-bottom: 1px solid var(--border); }
         .sidebar-search input { width: 100%; }
-        .sidebar-header { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 0.78rem; font-weight: 600; color: var(--text-sub); display: flex; justify-content: space-between; }
+        .sidebar-header { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 0.78rem; font-weight: 600; color: var(--text-sub); display: flex; justify-content: space-between; user-select: none; }
         .file-list { flex: 1; overflow-y: auto; list-style: none; }
         .file-item { padding: 11px 14px; border-bottom: 1px solid #181d26; font-size: 0.85rem; cursor: pointer; display: flex; flex-direction: column; gap: 3px; }
         .file-item:hover { background: var(--bg-hover); }
         .file-item.active { background: #1e2633; border-left: 3px solid var(--accent); }
-        .file-item .title { font-weight: 500; word-break: break-word; color: #fff; }
+        .file-item .folder-badge { font-size: 0.68rem; color: var(--accent); background: rgba(255, 140, 0, 0.1); padding: 2px 6px; border-radius: 3px; display: inline-block; width: fit-content; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-item .title { font-weight: 500; word-break: break-word; color: #fff; line-height: 1.3; }
         .file-item .meta { font-size: 0.72rem; color: var(--text-sub); }
 
         /* Stage */
@@ -60,7 +61,7 @@
         .osd.visible { opacity: 1; }
 
         /* VLC Player Deck */
-        .player-deck { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 0.6) 70%, transparent); padding: 24px 20px 12px; display: flex; flex-direction: column; gap: 8px; opacity: 1; transition: opacity 0.3s ease; z-index: 10; }
+        .player-deck { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 0.6) 70%, transparent); padding: 24px 20px 12px; display: flex; flex-direction: column; gap: 8px; opacity: 1; transition: opacity 0.3s ease; z-index: 10; user-select: none; }
         .player-deck.fade-out { opacity: 0; pointer-events: none; }
 
         /* Scrubbing Bar */
@@ -85,8 +86,12 @@
 
         .deck-select { background: #161b22; border: 1px solid var(--border); color: #fff; padding: 4px 6px; font-size: 0.8rem; border-radius: 4px; outline: none; cursor: pointer; }
 
-        /* Log Drawer */
-        .logs-drawer { height: 110px; background: #050608; border-top: 1px solid var(--border); padding: 8px 12px; font-family: monospace; font-size: 0.76rem; overflow-y: auto; color: var(--text-sub); }
+        /* Log Console Bar & Selectable Logs */
+        .logs-header { background: #0c0e12; border-top: 1px solid var(--border); padding: 6px 14px; font-size: 0.74rem; font-weight: 700; color: var(--text-sub); display: flex; justify-content: space-between; align-items: center; user-select: none; }
+        .mini-btn { background: #1f2530; color: var(--text-main); border: 1px solid var(--border); font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; cursor: pointer; }
+        .mini-btn:hover { background: #2d3545; color: #fff; }
+        .logs-drawer { height: 120px; background: #050608; padding: 8px 12px; font-family: monospace; font-size: 0.76rem; overflow-y: auto; color: var(--text-sub); user-select: text; -webkit-user-select: text; cursor: text; }
+        .log-entry { margin-bottom: 2px; }
         .log-entry.err { color: var(--danger); }
     </style>
 </head>
@@ -103,7 +108,7 @@
     <div class="workspace">
         <aside class="sidebar">
             <div class="sidebar-search">
-                <input type="text" id="searchInput" placeholder="Filter lectures..." autocomplete="off">
+                <input type="text" id="searchInput" placeholder="Filter lectures or folders..." autocomplete="off">
             </div>
             <div class="sidebar-header">
                 <span>LECTURE VAULTS</span>
@@ -168,6 +173,13 @@
                 </div>
             </div>
             
+            <div class="logs-header">
+                <span>CONSOLE LOGS</span>
+                <div style="display: flex; gap: 6px;">
+                    <button class="mini-btn" id="copyLogsBtn">📋 Copy Logs</button>
+                    <button class="mini-btn" id="clearLogsBtn">✕ Clear</button>
+                </div>
+            </div>
             <div class="logs-drawer" id="logsOutput"></div>
         </main>
     </div>
@@ -202,7 +214,30 @@
         const logChannel = new BroadcastChannel('streamvault_logs');
         logChannel.onmessage = (e) => appendLog(e.data.msg, e.data.isError);
 
-        // Service Worker
+        // Copy & Clear Logs
+        document.getElementById('copyLogsBtn').onclick = () => {
+            const logsText = Array.from(logsOutput.querySelectorAll('.log-entry'))
+                .map(el => el.textContent)
+                .join('\n');
+            if (!logsText) return showOSD('No logs to copy');
+            navigator.clipboard.writeText(logsText).then(() => {
+                showOSD('Logs Copied to Clipboard!');
+            }).catch(() => {
+                const ta = document.createElement('textarea');
+                ta.value = logsText;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showOSD('Logs Copied to Clipboard!');
+            });
+        };
+
+        document.getElementById('clearLogsBtn').onclick = () => {
+            logsOutput.innerHTML = '';
+        };
+
+        // Service Worker Registration
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
                 .then(() => appendLog('Service Worker Engine online.'))
@@ -237,7 +272,7 @@
             clearTimeout(idleTimer);
         });
 
-        // Google Auth & Vault Listing
+        // Google Auth & Recursive Vault Listing
         let tokenClient;
         document.getElementById('authBtn').addEventListener('click', () => {
             const password = document.getElementById('vaultPassword').value;
@@ -264,18 +299,76 @@
             }
         });
 
+        // Recursive Subfolder Scanner
         async function scanDriveFolder() {
-            appendLog('Scanning Drive for HLS Vaults...');
-            try {
-                const query = `mimeType != 'application/vnd.google-apps.folder' and trashed = false and name contains '_HLS_Z.zip' and '${TARGET_DRIVE_FOLDER}' in parents`;
-                const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,size)&pageSize=200`, {
-                    headers: { 'Authorization': `Bearer ${accessToken}` }
-                });
-                const data = await res.json();
-                if (data.error) throw new Error(data.error.message);
+            appendLog('Starting recursive scan of destination folder tree...');
+            const fileListEl = document.getElementById('fileList');
+            fileListEl.innerHTML = '<li style="padding: 20px; text-align: center; color: var(--text-sub);">Crawling directory tree...</li>';
 
-                cachedFiles = data.files || [];
+            try {
+                // Step 1: Map all nested subfolders
+                const folderPaths = new Map();
+                folderPaths.set(TARGET_DRIVE_FOLDER, "");
+                const folderQueue = [TARGET_DRIVE_FOLDER];
+
+                while (folderQueue.length > 0) {
+                    const currentId = folderQueue.shift();
+                    const currentPath = folderPaths.get(currentId);
+
+                    let pageToken = null;
+                    do {
+                        const q = `'${currentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+                        const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=nextPageToken,files(id,name)&pageSize=1000${pageToken ? `&pageToken=${pageToken}` : ''}`, {
+                            headers: { 'Authorization': `Bearer ${accessToken}` }
+                        });
+                        const data = await res.json();
+                        if (data.error) throw new Error(data.error.message);
+
+                        for (const folder of (data.files || [])) {
+                            const subPath = currentPath ? `${currentPath} / ${folder.name}` : folder.name;
+                            folderPaths.set(folder.id, subPath);
+                            folderQueue.push(folder.id);
+                        }
+                        pageToken = data.nextPageToken;
+                    } while (pageToken);
+                }
+
+                appendLog(`Indexed ${folderPaths.size} folders. Fetching all _HLS_Z.zip archives...`);
+
+                // Step 2: Query all _HLS_Z.zip archives
+                let allFiles = [];
+                let filePageToken = null;
+                do {
+                    const query = `mimeType != 'application/vnd.google-apps.folder' and trashed = false and name contains '_HLS_Z.zip'`;
+                    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=nextPageToken,files(id,name,size,parents)&pageSize=500${filePageToken ? `&pageToken=${filePageToken}` : ''}`, {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    const data = await res.json();
+                    if (data.error) throw new Error(data.error.message);
+
+                    allFiles.push(...(data.files || []));
+                    filePageToken = data.nextPageToken;
+                } while (filePageToken);
+
+                // Step 3: Match files that reside inside the folder tree
+                const targetFiles = allFiles.filter(f => f.parents && f.parents.some(p => folderPaths.has(p)));
+                
+                targetFiles.forEach(f => {
+                    const parentId = f.parents.find(p => folderPaths.has(p));
+                    f.folderPath = folderPaths.get(parentId) || "Root";
+                });
+
+                // Sort alphabetically by Folder Path, then Lecture Name
+                targetFiles.sort((a, b) => {
+                    const pathCmp = a.folderPath.localeCompare(b.folderPath);
+                    if (pathCmp !== 0) return pathCmp;
+                    return a.name.localeCompare(b.name);
+                });
+
+                cachedFiles = targetFiles;
                 renderFileList(cachedFiles);
+                appendLog(`Scan complete. Found ${targetFiles.length} archives across ${folderPaths.size} folders.`);
+
             } catch (err) {
                 appendLog(`Drive Scan Failed: ${err.message}`, true);
             }
@@ -295,16 +388,23 @@
                 const cleanTitle = file.name.replace('_HLS_Z.zip', '');
                 const li = document.createElement('li');
                 li.className = 'file-item';
-                li.innerHTML = `<div class="title">${cleanTitle}</div><div class="meta">${(file.size / 1048576).toFixed(1)} MB • AES-256 Vault</div>`;
+                li.innerHTML = `
+                    ${file.folderPath ? `<span class="folder-badge" title="${file.folderPath}">📁 ${file.folderPath}</span>` : ''}
+                    <div class="title">${cleanTitle}</div>
+                    <div class="meta">${(file.size / 1048576).toFixed(1)} MB • AES-256 Vault</div>
+                `;
                 li.onclick = () => loadHlsStream(file.id, cleanTitle, li);
                 fileListEl.appendChild(li);
             });
         }
 
-        // Live Search Filter
+        // Live Search Filter (searches both title and folder path)
         searchInput.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
-            const filtered = cachedFiles.filter(f => f.name.toLowerCase().includes(term));
+            const filtered = cachedFiles.filter(f => 
+                f.name.toLowerCase().includes(term) || 
+                (f.folderPath && f.folderPath.toLowerCase().includes(term))
+            );
             renderFileList(filtered);
         });
 
