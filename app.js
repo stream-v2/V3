@@ -88,7 +88,7 @@ async function loadDriveFiles() {
     els.fileGrid.innerHTML = '';
 
     try {
-        const query = encodeURIComponent(`'${FOLDER_ID}' in parents and fileExtension = 'zip' and trashed = false`);
+       const query = encodeURIComponent(`name contains '_Z.zip' and trashed = false`);
         const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,size)&pageSize=100`, {
             headers: { 'Authorization': `Bearer ${oauthToken}` }
         });
