@@ -38,17 +38,28 @@ async function initEngine() {
     }
 }
 
-window.onload = async function () {
+window.onload = function () {
     logToScreen("System Booting...");
-    await initEngine();
+    
+    // 1. Boot Service Worker in the background (Do not block the login button!)
+    initEngine();
 
+    // 2. Initialize Google Login
     let tokenClient;
     try {
+        if (typeof google === 'undefined') {
+            logToScreen("[AUTH_ERR_01] Google script blocked by browser or adblocker.", true);
+            return;
+        }
+
         tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID,
+            client_id: CLIENT_ID, // Ensure your Client ID at the top is correct!
             scope: 'https://www.googleapis.com/auth/drive.readonly',
             callback: (response) => {
                 logToScreen("OAuth Success. Tunneling token to vault...");
+                authBtn.disabled = false;
+                authBtn.innerText = "Login with Google";
+
                 if (response.error || !response.access_token) return logToScreen("Auth failed.", true);
                 
                 oauthToken = response.access_token;
@@ -61,8 +72,32 @@ window.onload = async function () {
                 driveUi.style.display = 'block';
                 statusText.innerText = "Vault Connected";
                 loadDriveFiles();
+            },
+            error_callback: (err) => {
+                authBtn.disabled = false;
+                authBtn.innerText = "Login with Google";
+                logToScreen(`Google Popup Error: ${err.type}`, true);
             }
         });
+        
+        logToScreen("Login system ready.");
+    } catch (err) {
+        logToScreen(`Client Error: ${err.message}`, true);
+    }
+
+    // 3. The Button Click Event (Now with visual feedback restored)
+    authBtn.onclick = () => {
+        authBtn.disabled = true;
+        authBtn.innerText = "Authorizing...";
+        logToScreen("Opening login popup...");
+        
+        if (tokenClient) {
+            tokenClient.requestAccessToken({ prompt: 'select_account' });
+        } else {
+            logToScreen("Cannot open popup. Google client failed to initialize.", true);
+        }
+    };
+};
     } catch (err) {
         logToScreen(`Client Error: ${err.message}`, true);
     }
