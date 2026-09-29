@@ -3,83 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vault Stream</title>
-    <!-- Tailwind CSS for modern, instant styling -->
+    <title>StreamVault | Secure AES-256 Player</title>
+    <!-- Tailwind CSS for Advanced UI -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <!-- FontAwesome for icons -->
+    <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        /* Custom scrollbar for the terminal */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #0f172a; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); }
-    </style>
+    <!-- zip.js Engine -->
+    <script src="https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.29/dist/zip.min.js"></script>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
+<body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen flex flex-col">
 
-    <!-- Header -->
-    <header class="bg-slate-800 border-b border-slate-700 p-4 flex justify-between items-center shadow-lg">
-        <h2 class="text-xl font-bold flex items-center gap-2">
-            <i class="fa-solid fa-vault text-blue-500"></i> Vault Stream Player
-        </h2>
-        <span id="status-text" class="text-sm text-slate-400 font-medium">Booting...</span>
+    <!-- Navbar -->
+    <header class="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-shield-halved text-blue-500 text-xl"></i>
+                <h1 class="text-xl font-bold tracking-tight">Stream<span class="text-blue-500">Vault</span></h1>
+            </div>
+            <button id="authBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-blue-500/20">
+                Connect Drive
+            </button>
+        </div>
     </header>
 
-    <!-- Login Screen -->
-    <div id="login-screen" class="flex-grow flex justify-center items-center">
-        <button id="auth-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-lg font-bold shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2">
-            <i class="fa-brands fa-google"></i> Login with Google
-        </button>
-    </div>
-
-    <!-- Drive UI Grid -->
-    <div id="drive-ui" class="hidden p-6 max-w-7xl mx-auto w-full flex-grow">
-        <h3 class="text-lg font-semibold text-slate-300 mb-4 flex items-center gap-2">
-            <i class="fa-solid fa-cloud"></i> Available Archives
-        </h3>
-        <div id="file-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <!-- Cards injected here -->
-        </div>
-    </div>
-
-    <!-- Loading Overlay (NEW) -->
-    <div id="loading-overlay" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-50 flex flex-col justify-center items-center">
-        <i class="fa-solid fa-circle-notch fa-spin text-5xl text-blue-500 mb-4"></i>
-        <h2 id="loading-text" class="text-xl font-bold text-white">Decrypting Engine...</h2>
-        <p class="text-slate-400 mt-2 text-sm">Please wait while the keys are derived.</p>
-    </div>
-
-    <!-- Password Modal -->
-    <div id="password-modal" class="hidden fixed inset-0 bg-black/80 z-40 flex justify-center items-center p-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-sm shadow-2xl">
-            <h3 class="text-lg font-bold mb-1"><i class="fa-solid fa-lock text-red-400 mr-2"></i>Encrypted Archive</h3>
-            <p id="target-file-label" class="text-xs text-slate-400 mb-4 break-all"></p>
-            <input type="password" id="archive-password" class="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white focus:outline-none focus:border-blue-500 mb-4" placeholder="Enter password...">
-            <div class="flex gap-2">
-                <button id="submit-password" class="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded font-bold transition-colors">Unlock</button>
-                <button id="cancel-password" class="flex-1 bg-slate-700 hover:bg-slate-600 py-2 rounded font-bold transition-colors">Cancel</button>
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 py-8 w-full">
+        
+        <!-- Video Player Section (Hidden by default) -->
+        <div id="playerContainer" class="hidden mb-12 animate-fade-in">
+            <div class="relative bg-black rounded-2xl overflow-hidden shadow-2xl aspect-video border border-slate-700">
+                <video id="videoPlayer" class="w-full h-full object-contain" controls controlsList="nodownload"></video>
+                <div id="nowPlayingLabel" class="absolute top-4 left-4 bg-slate-900/80 backdrop-blur text-sm px-3 py-1 rounded-full text-slate-300 font-medium"></div>
             </div>
         </div>
-    </div>
 
-    <!-- Video Modal -->
-    <div id="video-modal" class="hidden fixed inset-0 bg-black/95 z-50 flex flex-col p-4 md:p-10">
-        <div class="flex justify-between items-center mb-4">
-            <h3 id="playing-title" class="text-lg font-bold truncate pr-4">Video</h3>
-            <button id="close-modal" class="text-slate-400 hover:text-white text-3xl leading-none">&times;</button>
+        <!-- Library Grid -->
+        <div class="mb-6 flex justify-between items-end">
+            <h2 class="text-2xl font-bold">Secure Library</h2>
+            <span id="statusText" class="text-sm text-slate-400">Waiting for authentication...</span>
         </div>
-        <div id="video-container" class="w-full max-w-6xl mx-auto aspect-video bg-black rounded-lg overflow-hidden shadow-2xl flex items-center justify-center"></div>
-    </div>
+        
+        <div id="fileGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <!-- Video Cards Inject Here -->
+        </div>
+    </main>
 
-    <!-- Diagnostic Terminal -->
-    <div class="p-6">
-        <div id="debug-console" class="glass-panel border border-slate-700 rounded-lg p-4 font-mono text-xs h-40 overflow-y-auto">
-            <div class="text-green-400">[SYSTEM START] Terminal ready...</div>
+    <!-- AES Password Modal -->
+    <div id="passwordModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+        <div class="bg-slate-800 border border-slate-700 p-8 rounded-2xl shadow-2xl w-full max-w-md transform scale-95 transition-all">
+            <div class="flex items-center justify-center w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 mb-4 mx-auto">
+                <i class="fa-solid fa-lock text-xl"></i>
+            </div>
+            <h3 class="text-xl font-bold text-center mb-2">Unlock Archive</h3>
+            <p id="targetFileLabel" class="text-sm text-slate-400 text-center mb-6 truncate px-4"></p>
+            
+            <form id="unlockForm" class="flex flex-col gap-4">
+                <input type="password" id="archivePassword" placeholder="AES-256 Passphrase" required
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all">
+                
+                <div class="flex gap-3 mt-2">
+                    <button type="button" id="cancelUnlock" class="flex-1 py-3 px-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-medium transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 py-3 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-medium transition-colors shadow-lg shadow-blue-500/20">
+                        Decrypt & Play
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
-    <script src="./app.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
