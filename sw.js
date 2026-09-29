@@ -33,9 +33,21 @@ class DriveZipReader extends zip.Reader {
         super();
         this.fileId = fileId;
         this.token = token;
+        this.size = 0; // CRITICAL: Required by zip.js to locate the Central Directory
         this.directUrl = '';
     }
+
     async init() {
+        sysLog("[Engine] Fetching exact file size...");
+        const metaRes = await fetch(`https://www.googleapis.com/drive/v3/files/${this.fileId}?fields=size`, {
+            headers: { 'Authorization': `Bearer ${this.token}` }
+        });
+        
+        if (!metaRes.ok) throw new Error("Failed to fetch file metadata.");
+        const metaData = await metaRes.json();
+        this.size = parseInt(metaData.size, 10);
+        sysLog(`[Engine] Archive size mapped: ${(this.size / 1024 / 1024).toFixed(2)} MB`);
+
         sysLog("[Engine] Resolving CDN redirect (CORS Bypass)...");
         const driveUrl = `https://www.googleapis.com/drive/v3/files/${this.fileId}?alt=media&acknowledgeAbuse=true`;
         const abortCtrl = new AbortController();
@@ -43,10 +55,13 @@ class DriveZipReader extends zip.Reader {
             headers: { 'Authorization': `Bearer ${this.token}` },
             signal: abortCtrl.signal
         });
+        
         this.directUrl = initRes.url; 
         abortCtrl.abort(); 
+        
         super.init();
     }
+
     async readUint8Array(offset, length) {
         const end = offset + length - 1;
         const res = await fetch(this.directUrl, {
@@ -74,7 +89,6 @@ class WebStreamWriter extends zip.Writer {
     }
     async getData() {
         await this.writer.close();
-        return; // Stream closed, video plays!
     }
 }
 // ==========================================
@@ -114,8 +128,6 @@ async function streamDecryptedVideo(fileId) {
         if (ext === 'm4v') mimeType = 'video/x-m4v';
 
         const { readable, writable } = new TransformStream();
-        
-        // CRITICAL FIX: Using our own foolproof writer class!
         const streamWriter = new WebStreamWriter(writable);
 
         sysLog("Igniting AES-256 decryption pipe...");
