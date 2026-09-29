@@ -69,22 +69,33 @@ window.onload = async function () {
 
     authBtn.onclick = () => tokenClient.requestAccessToken({ prompt: 'select_account' });
 };
-
 async function loadDriveFiles() {
-    logToScreen("Scanning Drive for Encrypted Archives...");
+    logToScreen("Scanning Drive for strict .7z Archives...");
     try {
-        const query = encodeURIComponent("name contains '.7z' and trashed = false");
+        // 1. Strict API Query: fileExtension must be exactly 7z
+        const query = encodeURIComponent("fileExtension = '7z' and trashed = false");
         const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,size)&pageSize=100`, {
             headers: { 'Authorization': `Bearer ${oauthToken}` }
         });
 
+        if (!res.ok) {
+            logToScreen(`[API_ERR_02] Drive API rejected request: ${res.status}`, true);
+            return;
+        }
+
         const data = await res.json();
         fileGrid.innerHTML = '';
 
-        if (!data.files || data.files.length === 0) return logToScreen("No .7z files found.", true);
+        // 2. JavaScript Armor: Physically ensure the name ends with .7z (kills .7z.par2)
+        const validFiles = (data.files || []).filter(file => file.name.toLowerCase().endsWith('.7z'));
 
-        logToScreen(`Found ${data.files.length} protected archives.`);
-        data.files.forEach(file => {
+        if (validFiles.length === 0) {
+            return logToScreen("No strict .7z files found in Drive.", true);
+        }
+
+        logToScreen(`Filtered down to ${validFiles.length} verified archives.`);
+        
+        validFiles.forEach(file => {
             const sizeMB = file.size ? Math.round(file.size / 1024 / 1024) : 'Unknown';
             const card = document.createElement('div');
             card.className = 'file-card';
@@ -98,6 +109,10 @@ async function loadDriveFiles() {
             };
             fileGrid.appendChild(card);
         });
+    } catch (err) {
+        logToScreen(`[API_ERR_02] Network/API Error: ${err.message}`, true);
+    }
+}
     } catch (err) {
         logToScreen(`API Error: ${err.message}`, true);
     }
