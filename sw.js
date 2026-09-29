@@ -31,6 +31,60 @@ self.addEventListener('message', (e) => {
     }
 });
 
+// ==========================================
+// CUSTOM GOOGLE DRIVE ZIP ENGINE
+// ==========================================
+class DriveZipReader extends zip.Reader {
+    constructor(fileId, token) {
+        super();
+        this.fileId = fileId;
+        this.token = token;
+        this.size = 0;
+        this.directUrl = '';
+    }
+
+    async init() {
+        sysLog("[Engine] Fetching exact file size to prevent 403 range errors...");
+        const metaRes = await fetch(`https://www.googleapis.com/drive/v3/files/${this.fileId}?fields=size`, {
+            headers: { 'Authorization': `Bearer ${this.token}` }
+        });
+        
+        if (!metaRes.ok) throw new Error("Failed to fetch file metadata.");
+        const metaData = await metaRes.json();
+        this.size = parseInt(metaData.size, 10);
+        sysLog(`[Engine] Archive size mapped: ${(this.size / 1024 / 1024).toFixed(2)} MB`);
+
+        sysLog("[Engine] Resolving CDN redirect (CORS Bypass)...");
+        const driveUrl = `https://www.googleapis.com/drive/v3/files/${this.fileId}?alt=media&acknowledgeAbuse=true`;
+        const abortCtrl = new AbortController();
+        const initRes = await fetch(driveUrl, {
+            headers: { 'Authorization': `Bearer ${this.token}` },
+            signal: abortCtrl.signal
+        });
+        
+        this.directUrl = initRes.url; // Capture the final Google CDN stream URL
+        abortCtrl.abort(); // Immediately abort so we don't download it to RAM
+        
+        super.init();
+    }
+
+    async readUint8Array(offset, length) {
+        const end = offset + length - 1;
+        // Fetch strictly positive byte ranges from the direct CDN URL
+        const res = await fetch(this.directUrl, {
+            headers: {
+                'Authorization': `Bearer ${this.token}`,
+                'Range': `bytes=${offset}-${end}`
+            }
+        });
+        
+        if (!res.ok) throw new Error(`CDN Chunk Fetch Error: ${res.status}`);
+        const buffer = await res.arrayBuffer();
+        return new Uint8Array(buffer);
+    }
+}
+// ==========================================
+
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
     if (url.pathname.includes('/stream-vault/')) {
@@ -52,42 +106,16 @@ async function streamDecryptedVideo(fileId) {
     }
 
     try {
-        sysLog("Resolving Google Drive redirect to bypass CORS restrictions...");
+        sysLog("Initializing Custom Google Drive Engine...");
         
-        // 1. Fetch the initial Drive API URL to trigger the redirect
-        const initialUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&acknowledgeAbuse=true`;
-        const abortCtrl = new AbortController();
+        // Pass our custom reader into zip.js
+        const customReader = new DriveZipReader(fileId, authToken);
+        const zipReader = new zip.ZipReader(customReader);
         
-        const initialRes = await fetch(initialUrl, {
-            headers: { 'Authorization': `Bearer ${authToken}` },
-            signal: abortCtrl.signal
-        });
-
-        if (!initialRes.ok) {
-            throw new Error(`Google API blocked the request: ${initialRes.status}`);
-        }
-
-        // 2. Capture the final direct URL from Google's media servers
-        const finalStreamUrl = initialRes.url;
-        
-        // 3. Abort the dummy fetch so it doesn't download the whole file into RAM
-        abortCtrl.abort();
-        
-        sysLog("Redirect resolved. Initializing direct Range Reader...");
-
-        // 4. Feed the signed URL to the ZIP engine. 
-        // CRITICAL FIX: No Auth headers are sent here. The URL is already signed by Google!
-        const reader = new zip.HttpRangeReader(finalStreamUrl, {
-            useXHR: false,
-            preventHeadRequest: true
-        });
-
         sysLog("Reading ZIP Central Directory...");
-        const zipReader = new zip.ZipReader(reader);
         const entries = await zipReader.getEntries();
 
         sysLog(`Found ${entries.length} files in archive. Searching for Video...`);
-        
         const videoEntry = entries.find(e => e.filename.match(/\.(mp4|m4v|mkv)$/i));
         
         if (!videoEntry) {
