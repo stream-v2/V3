@@ -4,6 +4,7 @@ zip.configure({ useWebWorkers: false });
 
 let authToken = null;
 const activeVaults = new Map();
+const activeStreams = new Set(); // Prevents duplicate concurrent stream collisions
 const logChannel = new BroadcastChannel('streamvault_logs');
 
 function sysLog(msg, isError = false) {
@@ -71,7 +72,7 @@ class DriveZipReader extends zip.Reader {
 }
 
 // ==========================================
-// 2. CUSTOM HTML5 VIDEO STREAM WRITER (Optimized Chunking)
+// 2. CUSTOM HTML5 VIDEO STREAM WRITER
 // ==========================================
 class WebStreamWriter extends zip.Writer {
     constructor(writableStream) {
@@ -79,28 +80,38 @@ class WebStreamWriter extends zip.Writer {
         this.writer = writableStream.getWriter();
     }
     async writeUint8Array(array) {
-        await this.writer.write(array);
+        try {
+            await this.writer.write(array);
+        } catch (e) {
+            // SW closed or player disconnected
+        }
     }
     async getData() {
         try {
             await this.writer.close();
-        } catch (e) {
-            // Ignore stream close race conditions
-        }
+        } catch (e) {}
     }
 }
 
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
     if (url.pathname.includes('/stream-vault/')) {
-        event.respondWith(streamDecryptedVideo(event.request, url.pathname.split('/').pop()));
+        event.respondWith(streamDecryptedVideo(url.pathname.split('/').pop()));
     }
 });
 
-async function streamDecryptedVideo(request, fileId) {
+async function streamDecryptedVideo(fileId) {
     if (!authToken) return new Response("No token", { status: 401 });
     const password = activeVaults.get(fileId);
     if (!password) return new Response("No password", { status: 403 });
+
+    // Prevent concurrent stream collisions
+    if (activeStreams.has(fileId)) {
+        sysLog("Stream already active. Suppressing duplicate request.");
+        return new Response("Stream in progress", { status: 429 });
+    }
+
+    activeStreams.add(fileId);
 
     try {
         sysLog("Initializing Custom Google Drive Engine...");
@@ -113,6 +124,7 @@ async function streamDecryptedVideo(request, fileId) {
         
         if (!videoEntry) {
             await zipReader.close();
+            activeStreams.delete(fileId);
             return new Response("No video found", { status: 404 });
         }
 
@@ -129,25 +141,30 @@ async function streamDecryptedVideo(request, fileId) {
 
         sysLog("Igniting AES-256 decryption pipe...");
         
-        // Run decryption asynchronously without blocking the initial response headers
         videoEntry.getData(streamWriter, { password: password })
-            .then(() => zipReader.close())
-            .catch(err => sysLog(`DECRYPTION FAILED: ${err.message}`, true));
+            .then(() => {
+                zipReader.close();
+                activeStreams.delete(fileId);
+            })
+            .catch(err => {
+                sysLog(`DECRYPTION FAILED: ${err.message}`, true);
+                activeStreams.delete(fileId);
+            });
 
         sysLog("Streaming decrypted buffer to player...");
 
-        // OPTIMIZATION: Enable partial range handling so the browser doesn't choke
         return new Response(readable, {
             status: 200,
             headers: {
                 'Content-Type': mimeType,
                 'Content-Length': fileSize.toString(),
-                'Accept-Ranges': 'bytes',
-                'Cache-Control': 'no-cache'
+                'Accept-Ranges': 'none', // Locked to sequential streaming to prevent chunk collisions
+                'Cache-Control': 'no-store'
             }
         });
 
     } catch (err) {
+        activeStreams.delete(fileId);
         sysLog(`FATAL ENGINE ERROR: ${err.message}`, true);
         return new Response(err.message, { status: 500 });
     }
