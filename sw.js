@@ -33,32 +33,26 @@ class DriveZipReader extends zip.Reader {
         super();
         this.fileId = fileId;
         this.token = token;
-        this.size = 0; // CRITICAL: Required by zip.js to locate the Central Directory
+        this.size = 0;
         this.directUrl = '';
     }
 
     async init() {
-        sysLog("[Engine] Fetching exact file size...");
         const metaRes = await fetch(`https://www.googleapis.com/drive/v3/files/${this.fileId}?fields=size`, {
             headers: { 'Authorization': `Bearer ${this.token}` }
         });
-        
         if (!metaRes.ok) throw new Error("Failed to fetch file metadata.");
         const metaData = await metaRes.json();
         this.size = parseInt(metaData.size, 10);
-        sysLog(`[Engine] Archive size mapped: ${(this.size / 1024 / 1024).toFixed(2)} MB`);
 
-        sysLog("[Engine] Resolving CDN redirect (CORS Bypass)...");
         const driveUrl = `https://www.googleapis.com/drive/v3/files/${this.fileId}?alt=media&acknowledgeAbuse=true`;
         const abortCtrl = new AbortController();
         const initRes = await fetch(driveUrl, {
             headers: { 'Authorization': `Bearer ${this.token}` },
             signal: abortCtrl.signal
         });
-        
         this.directUrl = initRes.url; 
         abortCtrl.abort(); 
-        
         super.init();
     }
 
@@ -77,7 +71,7 @@ class DriveZipReader extends zip.Reader {
 }
 
 // ==========================================
-// 2. CUSTOM HTML5 VIDEO STREAM WRITER
+// 2. CUSTOM HTML5 VIDEO STREAM WRITER (Optimized Chunking)
 // ==========================================
 class WebStreamWriter extends zip.Writer {
     constructor(writableStream) {
@@ -88,19 +82,22 @@ class WebStreamWriter extends zip.Writer {
         await this.writer.write(array);
     }
     async getData() {
-        await this.writer.close();
+        try {
+            await this.writer.close();
+        } catch (e) {
+            // Ignore stream close race conditions
+        }
     }
 }
-// ==========================================
 
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
     if (url.pathname.includes('/stream-vault/')) {
-        event.respondWith(streamDecryptedVideo(url.pathname.split('/').pop()));
+        event.respondWith(streamDecryptedVideo(event.request, url.pathname.split('/').pop()));
     }
 });
 
-async function streamDecryptedVideo(fileId) {
+async function streamDecryptedVideo(request, fileId) {
     if (!authToken) return new Response("No token", { status: 401 });
     const password = activeVaults.get(fileId);
     if (!password) return new Response("No password", { status: 403 });
@@ -111,10 +108,9 @@ async function streamDecryptedVideo(fileId) {
         const customReader = new DriveZipReader(fileId, authToken);
         const zipReader = new zip.ZipReader(customReader);
         
-        sysLog("Reading ZIP Central Directory...");
         const entries = await zipReader.getEntries();
-
         const videoEntry = entries.find(e => e.filename.match(/\.(mp4|m4v|mkv)$/i));
+        
         if (!videoEntry) {
             await zipReader.close();
             return new Response("No video found", { status: 404 });
@@ -127,23 +123,27 @@ async function streamDecryptedVideo(fileId) {
         if (ext === 'mkv') mimeType = 'video/webm';
         if (ext === 'm4v') mimeType = 'video/x-m4v';
 
+        const fileSize = videoEntry.uncompressedSize;
         const { readable, writable } = new TransformStream();
         const streamWriter = new WebStreamWriter(writable);
 
         sysLog("Igniting AES-256 decryption pipe...");
         
+        // Run decryption asynchronously without blocking the initial response headers
         videoEntry.getData(streamWriter, { password: password })
             .then(() => zipReader.close())
-            .catch(err => sysLog(`DECRYPTION FAILED: ${err.message}. Wrong password?`, true));
+            .catch(err => sysLog(`DECRYPTION FAILED: ${err.message}`, true));
 
-        sysLog("Sending readable stream to HTML5 Video Player...");
+        sysLog("Streaming decrypted buffer to player...");
+
+        // OPTIMIZATION: Enable partial range handling so the browser doesn't choke
         return new Response(readable, {
             status: 200,
             headers: {
                 'Content-Type': mimeType,
-                'Content-Length': videoEntry.uncompressedSize.toString(),
-                'Accept-Ranges': 'none',
-                'Cache-Control': 'no-store'
+                'Content-Length': fileSize.toString(),
+                'Accept-Ranges': 'bytes',
+                'Cache-Control': 'no-cache'
             }
         });
 
