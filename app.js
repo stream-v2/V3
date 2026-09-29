@@ -19,61 +19,72 @@ const els = {
     targetFileLabel: document.getElementById('targetFileLabel')
 };
 
-// --- SERVICE WORKER SETUP ---
-async function initServiceWorker() {
-    if ('serviceWorker' in navigator) {
-        try {
+// --- ERROR LOGGER ---
+function logError(message) {
+    console.error("[CRITICAL]", message);
+    els.statusText.innerHTML = `<span class="text-red-500 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> ${message}</span>`;
+}
+
+// --- APP BOOTSTRAP (Called by index.html onload) ---
+window.initApp = async function() {
+    els.statusText.innerText = "Booting Service Worker...";
+    try {
+        if ('serviceWorker' in navigator) {
             const reg = await navigator.serviceWorker.register('sw.js');
             await navigator.serviceWorker.ready;
-            console.log('StreamVault Engine Active');
-        } catch (e) {
-            console.error('Failed to boot StreamVault Engine', e);
-        }
-    }
-}
-
-function syncTokenToWorker() {
-    if (navigator.serviceWorker.controller && oauthToken) {
-        navigator.serviceWorker.controller.postMessage({
-            type: 'INIT_VAULT',
-            token: oauthToken
-        });
-    }
-}
-
-// --- GOOGLE AUTHENTICATION ---
-function initGoogleAuth() {
-    // Initialize Google Identity Services
-    tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/drive.readonly',
-        callback: (response) => {
-            if (response.error !== undefined) {
-                els.statusText.innerText = "Authentication failed.";
-                return;
+            
+            // Force the SW to control the page immediately
+            if (!navigator.serviceWorker.controller) {
+                window.location.reload();
             }
-            
-            // Save Token & Update UI
-            oauthToken = response.access_token;
-            els.authBtn.innerText = "Vault Connected";
-            els.authBtn.classList.replace('bg-blue-600', 'bg-emerald-600');
-            els.authBtn.classList.replace('hover:bg-blue-500', 'hover:bg-emerald-500');
-            
-            // Pass token to the ZIP engine and load files
-            syncTokenToWorker();
-            loadDriveFiles();
+        } else {
+            throw new Error("Browser does not support Service Workers.");
         }
-    });
 
-    // Wire up the Connect button
-    els.authBtn.addEventListener('click', () => {
-        tokenClient.requestAccessToken({ prompt: 'consent' });
-    });
-}
+        els.statusText.innerText = "Initializing Google Auth...";
+        
+        if (typeof google === 'undefined') {
+            throw new Error("Google Identity script failed to load. Disable adblockers.");
+        }
+
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: 'https://www.googleapis.com/auth/drive.readonly',
+            callback: (response) => {
+                if (response.error) {
+                    logError(`Google Auth Failed: ${response.error}`);
+                    return;
+                }
+                oauthToken = response.access_token;
+                els.authBtn.innerText = "Vault Connected";
+                els.authBtn.classList.replace('bg-blue-600', 'bg-emerald-600');
+                
+                if (navigator.serviceWorker.controller) {
+                    navigator.serviceWorker.controller.postMessage({ type: 'INIT_VAULT', token: oauthToken });
+                }
+                loadDriveFiles();
+            }
+        });
+
+        els.authBtn.addEventListener('click', () => {
+            els.statusText.innerText = "Waiting for Google login pop-up...";
+            try {
+                tokenClient.requestAccessToken({ prompt: 'consent' });
+            } catch (err) {
+                logError("Failed to trigger pop-up: " + err.message);
+            }
+        });
+
+        els.statusText.innerText = "Engine ready. Click 'Connect Drive'.";
+
+    } catch (err) {
+        logError(err.message);
+    }
+};
 
 // --- GOOGLE DRIVE FILE SCANNER ---
 async function loadDriveFiles() {
-    els.statusText.innerText = "Scanning encrypted vault...";
+    els.statusText.innerText = "Scanning Drive for AES-256 ZIPs...";
     els.fileGrid.innerHTML = '';
 
     try {
@@ -82,25 +93,23 @@ async function loadDriveFiles() {
             headers: { 'Authorization': `Bearer ${oauthToken}` }
         });
 
-        if (!res.ok) throw new Error(`Drive API Error: ${res.status}`);
+        if (!res.ok) throw new Error(`Google API rejected request (Status ${res.status}). Check Authorized Origins in Cloud Console.`);
         const data = await res.json();
         
         if (!data.files || data.files.length === 0) {
-            els.statusText.innerText = "Vault is empty.";
+            els.statusText.innerText = "Folder is empty. No .zip files found.";
             return;
         }
 
         els.statusText.innerText = `${data.files.length} Secure Archives Found`;
 
-        // Render UI Cards
         data.files.forEach(file => {
             const sizeMB = file.size ? (file.size / 1024 / 1024).toFixed(1) : '???';
-            
             const card = document.createElement('div');
-            card.className = 'bg-slate-800 border border-slate-700 rounded-xl p-5 cursor-pointer hover:border-blue-500 hover:bg-slate-800/80 hover:-translate-y-1 transition-all group shadow-lg';
+            card.className = 'bg-slate-800 border border-slate-700 rounded-xl p-5 cursor-pointer hover:border-blue-500 hover:bg-slate-800/80 transition-all shadow-lg';
             card.innerHTML = `
                 <div class="flex flex-col gap-3">
-                    <div class="w-10 h-10 rounded-lg bg-slate-900 flex items-center justify-center text-slate-400 group-hover:text-blue-500 group-hover:bg-blue-500/10 transition-colors">
+                    <div class="w-10 h-10 rounded-lg bg-slate-900 flex items-center justify-center text-blue-400">
                         <i class="fa-solid fa-file-zipper text-xl"></i>
                     </div>
                     <div>
@@ -111,14 +120,12 @@ async function loadDriveFiles() {
                         </div>
                     </div>
                 </div>`;
-                
             card.onclick = () => openUnlockModal(file);
             els.fileGrid.appendChild(card);
         });
 
     } catch (err) {
-        els.statusText.innerText = "Error reading vault.";
-        console.error(err);
+        logError(err.message);
     }
 }
 
@@ -142,29 +149,24 @@ els.unlockForm.addEventListener('submit', (e) => {
     e.preventDefault();
     if (!pendingFile) return;
 
+    if (!navigator.serviceWorker.controller) {
+        logError("Service Worker disconnected. Refresh the page.");
+        return;
+    }
+
     const password = els.archivePassword.value;
-    
-    // 1. Send password to Service Worker securely
     navigator.serviceWorker.controller.postMessage({
         type: 'UNLOCK_FILE',
         fileId: pendingFile.id,
         password: password
     });
 
-    // 2. Prep Video Player UI
     els.nowPlayingLabel.innerText = pendingFile.name.replace('_Z.zip', '');
     els.playerContainer.classList.remove('hidden');
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // 3. Trigger the Service Worker Intercept
     els.videoPlayer.src = `/vault-stream/${pendingFile.id}`;
-    els.videoPlayer.play().catch(e => console.log("Waiting for user interaction to play..."));
+    els.videoPlayer.play().catch(e => console.log("Press play to start video."));
     
     closeUnlockModal();
 });
-
-// --- BOOT SEQUENCE ---
-window.onload = () => {
-    initServiceWorker();
-    initGoogleAuth();
-};
