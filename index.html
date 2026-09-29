@@ -42,10 +42,17 @@
         .sidebar-search { padding: 10px; border-bottom: 1px solid var(--border); }
         .sidebar-search input { width: 100%; }
         .sidebar-header { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 0.78rem; font-weight: 600; color: var(--text-sub); display: flex; justify-content: space-between; user-select: none; }
-        .file-list { flex: 1; overflow-y: auto; list-style: none; }
-        .file-item { padding: 11px 14px; border-bottom: 1px solid #181d26; font-size: 0.85rem; cursor: pointer; display: flex; flex-direction: column; gap: 3px; }
+        
+        .file-list { flex: 1; overflow-y: auto; list-style: none; position: relative; }
+        
+        /* NEW FOLDER TREE CSS */
+        .folder-header { background: #0b0e14; color: var(--accent); padding: 8px 14px; font-size: 0.75rem; font-weight: 700; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; position: sticky; top: 0; z-index: 5; text-transform: uppercase; letter-spacing: 0.5px; }
+        .folder-header span { color: var(--text-sub); font-weight: normal; }
+        
+        .file-item { padding: 11px 14px 11px 24px; border-bottom: 1px solid #181d26; font-size: 0.85rem; cursor: pointer; display: flex; flex-direction: column; gap: 3px; position: relative; }
+        .file-item::before { content: "↳"; position: absolute; left: 10px; top: 11px; color: #444; font-size: 0.9rem; }
         .file-item:hover { background: var(--bg-hover); }
-        .file-item.active { background: #1e2633; border-left: 3px solid var(--accent); }
+        .file-item.active { background: #1e2633; border-left: 3px solid var(--accent); padding-left: 21px; }
         .file-item .title { font-weight: 500; word-break: break-word; color: #fff; line-height: 1.3; }
         .file-item .meta { font-size: 0.72rem; color: var(--text-sub); }
 
@@ -66,7 +73,7 @@
         /* Scrubbing Bar */
         .timeline-container { position: relative; width: 100%; height: 6px; background: rgba(255, 255, 255, 0.2); border-radius: 3px; cursor: pointer; transition: height 0.15s; }
         .timeline-container:hover { height: 9px; }
-        .timeline-buffer { position: absolute; height: 100%; background: rgba(255, 255, 255, 0.35); border-radius: 3px; width: 0%; }
+        .timeline-buffer { position: absolute; height: 100%; background: rgba(255, 255, 255, 0.35); border-radius: 3px; width: 0%; transition: width 0.2s; }
         .timeline-progress { position: absolute; height: 100%; background: var(--accent); border-radius: 3px; width: 0%; pointer-events: none; }
 
         /* Controls Deck */
@@ -85,7 +92,7 @@
 
         .deck-select { background: #161b22; border: 1px solid var(--border); color: #fff; padding: 4px 6px; font-size: 0.8rem; border-radius: 4px; outline: none; cursor: pointer; }
 
-        /* Log Console Bar & Selectable Logs */
+        /* Log Console */
         .logs-header { background: #0c0e12; border-top: 1px solid var(--border); padding: 6px 14px; font-size: 0.74rem; font-weight: 700; color: var(--text-sub); display: flex; justify-content: space-between; align-items: center; user-select: none; }
         .mini-btn { background: #1f2530; color: var(--text-main); border: 1px solid var(--border); font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; cursor: pointer; }
         .mini-btn:hover { background: #2d3545; color: #fff; }
@@ -108,7 +115,7 @@
     <div class="workspace">
         <aside class="sidebar">
             <div class="sidebar-search">
-                <input type="text" id="searchInput" placeholder="Filter lectures..." autocomplete="off">
+                <input type="text" id="searchInput" placeholder="Filter lectures or folders..." autocomplete="off">
             </div>
             <div class="sidebar-header">
                 <span>LECTURE VAULTS</span>
@@ -187,6 +194,7 @@
     <!-- Embedded Engine -->
     <script>
         const GOOGLE_CLIENT_ID = '185170823583-t1g2t509cd1ogbhj9i9ctjb1rk9mpu8q.apps.googleusercontent.com';
+        const TARGET_DRIVE_FOLDER = '1BZzgwFUc-ISA6QyW--_31zP10IiMS_d0';
 
         const video = document.getElementById('vlcPlayer');
         const videoWrapper = document.getElementById('videoWrapper');
@@ -215,35 +223,21 @@
 
         // Copy & Clear Logs
         document.getElementById('copyLogsBtn').onclick = () => {
-            const logsText = Array.from(logsOutput.querySelectorAll('.log-entry'))
-                .map(el => el.textContent)
-                .join('\n');
+            const logsText = Array.from(logsOutput.querySelectorAll('.log-entry')).map(el => el.textContent).join('\n');
             if (!logsText) return showOSD('No logs to copy');
-            navigator.clipboard.writeText(logsText).then(() => {
-                showOSD('Logs Copied!');
-            }).catch(() => {
-                const ta = document.createElement('textarea');
-                ta.value = logsText;
-                document.body.appendChild(ta);
-                ta.select();
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-                showOSD('Logs Copied!');
+            navigator.clipboard.writeText(logsText).then(() => showOSD('Logs Copied!')).catch(() => {
+                const ta = document.createElement('textarea'); ta.value = logsText; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); showOSD('Logs Copied!');
             });
         };
+        document.getElementById('clearLogsBtn').onclick = () => logsOutput.innerHTML = '';
 
-        document.getElementById('clearLogsBtn').onclick = () => {
-            logsOutput.innerHTML = '';
-        };
-
-        // Service Worker Registration
+        // Service Worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
                 .then(() => appendLog('Service Worker Engine online.'))
                 .catch(err => appendLog(`SW Registration failed: ${err.message}`, true));
         }
 
-        // VLC On-Screen Display (OSD)
         function showOSD(text) {
             osd.textContent = text;
             osd.classList.add('visible');
@@ -251,7 +245,6 @@
             osdTimeout = setTimeout(() => osd.classList.remove('visible'), 1200);
         }
 
-        // Auto-Hide Controls on Mouse Idle
         function resetIdleTimer() {
             playerDeck.classList.remove('fade-out');
             videoWrapper.classList.remove('hide-cursor');
@@ -271,7 +264,7 @@
             clearTimeout(idleTimer);
         });
 
-        // Google Auth & Vault Listing (Global Signature Search)
+        // Google Auth
         let tokenClient;
         document.getElementById('authBtn').addEventListener('click', () => {
             const password = document.getElementById('vaultPassword').value;
@@ -298,35 +291,71 @@
             }
         });
 
-        // Lightning Fast Global Search
+        // Recursive Subfolder Scanner
         async function scanDriveFolder() {
-            appendLog('Running Global Signature Search for HLS Vaults...');
+            appendLog('Starting recursive scan of destination folder tree...');
             const fileListEl = document.getElementById('fileList');
-            fileListEl.innerHTML = '<li style="padding: 20px; text-align: center; color: var(--text-sub);">Searching Drive...</li>';
+            fileListEl.innerHTML = '<li style="padding: 20px; text-align: center; color: var(--text-sub);">Crawling directory tree...</li>';
 
             try {
-                // One single query bypassing folders entirely: Find anything ending in _HLS_Z.zip
-                const query = `name contains '_HLS_Z.zip' and trashed = false`;
-                const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,size)&pageSize=1000`, {
-                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                const folderPaths = new Map();
+                folderPaths.set(TARGET_DRIVE_FOLDER, "Root");
+                const folderQueue = [TARGET_DRIVE_FOLDER];
+
+                while (folderQueue.length > 0) {
+                    const currentId = folderQueue.shift();
+                    const currentPath = folderPaths.get(currentId) === "Root" ? "" : folderPaths.get(currentId);
+
+                    let pageToken = null;
+                    do {
+                        const q = `'${currentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+                        const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=nextPageToken,files(id,name)&pageSize=1000${pageToken ? `&pageToken=${pageToken}` : ''}`, {
+                            headers: { 'Authorization': `Bearer ${accessToken}` }
+                        });
+                        const data = await res.json();
+                        if (data.error) throw new Error(data.error.message);
+
+                        for (const folder of (data.files || [])) {
+                            const subPath = currentPath ? `${currentPath} / ${folder.name}` : folder.name;
+                            folderPaths.set(folder.id, subPath);
+                            folderQueue.push(folder.id);
+                        }
+                        pageToken = data.nextPageToken;
+                    } while (pageToken);
+                }
+
+                appendLog(`Indexed folders. Fetching all _HLS_Z.zip archives...`);
+
+                let allFiles = [];
+                let filePageToken = null;
+                do {
+                    const query = `mimeType != 'application/vnd.google-apps.folder' and trashed = false and name contains '_HLS_Z.zip'`;
+                    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=nextPageToken,files(id,name,size,parents)&pageSize=500${filePageToken ? `&pageToken=${filePageToken}` : ''}`, {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    const data = await res.json();
+                    if (data.error) throw new Error(data.error.message);
+                    allFiles.push(...(data.files || []));
+                    filePageToken = data.nextPageToken;
+                } while (filePageToken);
+
+                const targetFiles = allFiles.filter(f => f.parents && f.parents.some(p => folderPaths.has(p)));
+                
+                targetFiles.forEach(f => {
+                    const parentId = f.parents.find(p => folderPaths.has(p));
+                    f.folderPath = folderPaths.get(parentId) || "Root";
                 });
-                const data = await res.json();
-                
-                if (data.error) throw new Error(data.error.message);
-                
-                cachedFiles = data.files || [];
-                
-                // Sort alphabetically by name
-                cachedFiles.sort((a, b) => a.name.localeCompare(b.name));
-                
+
+                cachedFiles = targetFiles;
                 renderFileList(cachedFiles);
-                appendLog(`Search complete. Found ${cachedFiles.length} archives across your Drive.`);
+                appendLog(`Scan complete. Found ${targetFiles.length} archives.`);
 
             } catch (err) {
                 appendLog(`Drive Scan Failed: ${err.message}`, true);
             }
         }
 
+        // NEW: Grouped Folder Render
         function renderFileList(files) {
             const fileListEl = document.getElementById('fileList');
             fileListEl.innerHTML = '';
@@ -337,27 +366,47 @@
                 return;
             }
 
-            files.forEach(file => {
-                const cleanTitle = file.name.replace('_HLS_Z.zip', '');
-                const li = document.createElement('li');
-                li.className = 'file-item';
-                li.innerHTML = `
-                    <div class="title">${cleanTitle}</div>
-                    <div class="meta">${(file.size / 1048576).toFixed(1)} MB • AES-256 Vault</div>
-                `;
-                li.onclick = () => loadHlsStream(file.id, cleanTitle, li);
-                fileListEl.appendChild(li);
+            // Group by Folder Path
+            const groups = {};
+            files.forEach(f => {
+                const path = f.folderPath || "Root";
+                if (!groups[path]) groups[path] = [];
+                groups[path].push(f);
+            });
+
+            // Render Groups
+            Object.keys(groups).sort().forEach(folderName => {
+                // Folder Header
+                const header = document.createElement('div');
+                header.className = 'folder-header';
+                header.innerHTML = `📁 ${folderName} <span>(${groups[folderName].length})</span>`;
+                fileListEl.appendChild(header);
+
+                // Sort files inside folder alphabetically
+                groups[folderName].sort((a, b) => a.name.localeCompare(b.name)).forEach(file => {
+                    const cleanTitle = file.name.replace('_HLS_Z.zip', '');
+                    const li = document.createElement('li');
+                    li.className = 'file-item';
+                    li.innerHTML = `
+                        <div class="title">${cleanTitle}</div>
+                        <div class="meta">${(file.size / 1048576).toFixed(1)} MB • AES-256 Vault</div>
+                    `;
+                    li.onclick = () => loadHlsStream(file.id, cleanTitle, li);
+                    fileListEl.appendChild(li);
+                });
             });
         }
 
-        // Live Search Filter
         searchInput.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
-            const filtered = cachedFiles.filter(f => f.name.toLowerCase().includes(term));
+            const filtered = cachedFiles.filter(f => 
+                f.name.toLowerCase().includes(term) || 
+                (f.folderPath && f.folderPath.toLowerCase().includes(term))
+            );
             renderFileList(filtered);
         });
 
-        // HLS Loader
+        // HLS Loader with SMOOTH ENGINE FIX
         function loadHlsStream(fileId, title, listItem) {
             const password = document.getElementById('vaultPassword').value;
             if (!password) return alert('Enter your AES-256 Vault Password at the top.');
@@ -375,9 +424,11 @@
 
             if (Hls.isSupported()) {
                 hlsInstance = new Hls({
-                    maxBufferLength: 15,
-                    maxMaxBufferLength: 30,
-                    enableWorker: false
+                    // SMOOTH PLAYBACK FIX:
+                    maxBufferLength: 60,       // Buffer up to 60 seconds ahead
+                    maxMaxBufferLength: 120,   // Hard RAM ceiling
+                    maxBufferSize: 50 * 1024 * 1024, // Allow up to 50MB of RAM for butter-smooth skipping
+                    enableWorker: true         // CRITICAL: Unlocks main thread, fixes video chop
                 });
 
                 hlsInstance.loadSource(playlistUrl);
@@ -398,7 +449,7 @@
             }
         }
 
-        // Web Audio API Booster (Up to 200%)
+        // Web Audio API Booster
         let audioCtx, gainNode;
         function initAudioBooster() {
             if (audioCtx) return;
@@ -434,12 +485,10 @@
             showOSD(video.muted ? 'Muted' : `Volume: ${Math.round(volSlider.value * 100)}%`);
         };
 
-        // Aspect Ratio Toggle (Fit -> Fill -> Stretch)
         const aspectBtn = document.getElementById('aspectBtn');
         const aspectModes = ['contain', 'cover', 'fill'];
         const aspectLabels = ['FIT', 'ZOOM', 'STRETCH'];
         let currentAspectIdx = 0;
-
         function cycleAspectRatio() {
             currentAspectIdx = (currentAspectIdx + 1) % aspectModes.length;
             video.style.objectFit = aspectModes[currentAspectIdx];
@@ -448,24 +497,17 @@
         }
         aspectBtn.onclick = cycleAspectRatio;
 
-        // Play/Pause
         const playBtn = document.getElementById('playBtn');
         function togglePlay() {
             initAudioBooster();
-            if (video.paused) {
-                video.play();
-                showOSD('Play');
-            } else {
-                video.pause();
-                showOSD('Pause');
-            }
+            if (video.paused) { video.play(); showOSD('Play'); } 
+            else { video.pause(); showOSD('Pause'); }
         }
         playBtn.onclick = togglePlay;
         video.onclick = togglePlay;
         video.onplay = () => playBtn.textContent = '⏸';
         video.onpause = () => playBtn.textContent = '▶';
 
-        // Time & Draggable Scrubber
         let showRemaining = false;
         let isScrubbing = false;
         const timeDisplay = document.getElementById('timeDisplay');
@@ -478,17 +520,10 @@
 
         video.addEventListener('timeupdate', () => {
             if (isScrubbing) return;
-            const cur = video.currentTime;
-            const dur = video.duration || 0;
+            const cur = video.currentTime, dur = video.duration || 0;
             progressBar.style.width = `${(cur / dur) * 100}%`;
-
-            if (video.buffered.length > 0) {
-                bufferBar.style.width = `${(video.buffered.end(video.buffered.length - 1) / dur) * 100}%`;
-            }
-
-            timeDisplay.textContent = showRemaining 
-                ? `-${fmt(dur - cur)} / ${fmt(dur)}` 
-                : `${fmt(cur)} / ${fmt(dur)}`;
+            if (video.buffered.length > 0) bufferBar.style.width = `${(video.buffered.end(video.buffered.length - 1) / dur) * 100}%`;
+            timeDisplay.textContent = showRemaining ? `-${fmt(dur - cur)} / ${fmt(dur)}` : `${fmt(cur)} / ${fmt(dur)}`;
         });
 
         function seekFromEvent(e) {
@@ -498,14 +533,10 @@
             video.currentTime = pos * video.duration;
         }
 
-        timelineBar.addEventListener('mousedown', (e) => {
-            isScrubbing = true;
-            seekFromEvent(e);
-        });
+        timelineBar.addEventListener('mousedown', (e) => { isScrubbing = true; seekFromEvent(e); });
         window.addEventListener('mousemove', (e) => { if (isScrubbing) seekFromEvent(e); });
-        window.addEventListener('mouseup', () => { isScrubbing = false; });
+        window.addEventListener('mouseup', () => isScrubbing = false);
 
-        // Skip / Micro-step
         function seekRelative(secs) {
             video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + secs));
             showOSD(`${secs > 0 ? '+' : ''}${secs}s`);
@@ -515,19 +546,13 @@
         document.getElementById('stepBackBtn').onclick = () => { video.pause(); video.currentTime -= 0.04; showOSD('-1 Frame'); };
         document.getElementById('stepFwdBtn').onclick = () => { video.pause(); video.currentTime += 0.04; showOSD('+1 Frame'); };
 
-        // Speed & Display Controls
         const speedSelect = document.getElementById('speedSelect');
-        function setSpeed(rate) {
-            video.playbackRate = rate;
-            speedSelect.value = rate.toString();
-            showOSD(`Speed: ${rate.toFixed(2)}x`);
-        }
+        function setSpeed(rate) { video.playbackRate = rate; speedSelect.value = rate.toString(); showOSD(`Speed: ${rate.toFixed(2)}x`); }
         speedSelect.onchange = (e) => setSpeed(parseFloat(e.target.value));
 
         document.getElementById('pipBtn').onclick = () => document.pictureInPictureElement ? document.exitPictureInPicture() : video.requestPictureInPicture();
         document.getElementById('fullBtn').onclick = () => document.fullscreenElement ? document.exitFullscreen() : videoWrapper.requestFullscreen();
 
-        // VLC Keyboard Shortcuts
         window.addEventListener('keydown', (e) => {
             if (['INPUT', 'SELECT'].includes(e.target.tagName)) return;
             switch(e.code) {
