@@ -6,10 +6,9 @@
     <title>StreamVault Prototype</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.29/dist/zip.min.js"></script>
-    <!-- Google Identity Script -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
-<body class="bg-slate-900 text-white p-8 font-sans max-w-5xl mx-auto">
+<body class="bg-slate-900 text-white p-8 font-sans max-w-5xl mx-auto flex flex-col min-h-screen">
 
     <div class="flex justify-between items-center mb-8 border-b border-slate-700 pb-4">
         <h1 class="text-2xl font-bold">StreamVault Engine Test</h1>
@@ -18,19 +17,23 @@
         </button>
     </div>
 
-    <!-- Status & Errors -->
-    <div id="statusBox" class="mb-6 p-4 rounded bg-slate-800 text-slate-300 font-mono text-sm">
-        System booting... Please wait.
-    </div>
-
     <!-- Video Player (Hidden initially) -->
     <div id="playerWrapper" class="hidden mb-8">
         <h2 id="videoTitle" class="text-lg font-bold mb-2 text-blue-400"></h2>
-        <video id="videoPlayer" class="w-full bg-black rounded-lg aspect-video" controls></video>
+        <video id="videoPlayer" class="w-full bg-black rounded-lg aspect-video border border-slate-700 shadow-lg shadow-black" controls></video>
     </div>
 
     <!-- File List -->
-    <div id="fileList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
+    <div id="fileList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8"></div>
+
+    <!-- LIVE DIAGNOSTIC TERMINAL -->
+    <div class="mt-auto">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-bold text-slate-400">System Terminal Log</h3>
+            <span id="statusBox" class="text-xs font-mono text-yellow-400">System booting...</span>
+        </div>
+        <div id="debugTerminal" class="w-full bg-black border border-slate-700 rounded-lg p-4 h-64 overflow-y-auto font-mono text-xs text-green-400 whitespace-pre-wrap"></div>
+    </div>
 
     <script src="app.js"></script>
 </body>
