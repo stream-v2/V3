@@ -7,57 +7,93 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.29/dist/zip.min.js"></script>
-    <!-- CRITICAL FIX: The onload parameter ensures the app only starts when Google is actually ready -->
     <script src="https://accounts.google.com/gsi/client" async defer onload="initApp()"></script>
+    <style>
+        /* Custom Cinematic Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #020617; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
 </head>
-<body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen flex flex-col">
+<body class="bg-slate-950 text-slate-200 font-sans antialiased min-h-screen flex flex-col selection:bg-blue-500/30">
 
-    <header class="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <i class="fa-solid fa-shield-halved text-blue-500 text-xl"></i>
-                <h1 class="text-xl font-bold tracking-tight">Stream<span class="text-blue-500">Vault</span></h1>
+    <!-- Cinematic Navbar -->
+    <header class="bg-slate-900/50 backdrop-blur-xl border-b border-white/5 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <i class="fa-solid fa-play text-white ml-1"></i>
+                </div>
+                <h1 class="text-2xl font-black tracking-tight text-white">Stream<span class="text-blue-500">Vault</span></h1>
             </div>
-            <button id="authBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-blue-500/20">
-                Connect Drive
+            <button id="authBtn" class="bg-white/10 hover:bg-blue-600 text-white px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-300 flex items-center gap-2">
+                <i class="fa-brands fa-google"></i> Connect Drive
             </button>
         </div>
     </header>
 
-    <main class="flex-grow max-w-7xl mx-auto px-4 py-8 w-full">
+    <main class="flex-grow max-w-7xl mx-auto px-6 py-10 w-full">
         
-        <!-- Video Player Section -->
-        <div id="playerContainer" class="hidden mb-12 animate-fade-in">
-            <div class="relative bg-black rounded-2xl overflow-hidden shadow-2xl aspect-video border border-slate-700">
-                <video id="videoPlayer" class="w-full h-full object-contain" controls controlsList="nodownload"></video>
-                <div id="nowPlayingLabel" class="absolute top-4 left-4 bg-slate-900/80 backdrop-blur text-sm px-3 py-1 rounded-full text-slate-300 font-medium"></div>
+        <!-- Error Console (Hidden by default) -->
+        <div id="errorConsole" class="hidden mb-8 bg-red-950/50 border border-red-500/50 rounded-xl p-4 flex gap-4 items-start backdrop-blur-md">
+            <i class="fa-solid fa-triangle-exclamation text-red-500 mt-1 text-xl"></i>
+            <div>
+                <h3 class="text-red-400 font-bold font-mono text-sm" id="errorCodeLabel">ERR_UNKNOWN</h3>
+                <p class="text-red-200 text-sm mt-1" id="errorConsoleMessage"></p>
             </div>
         </div>
 
-        <div class="mb-6 flex justify-between items-end">
-            <h2 class="text-2xl font-bold">Secure Library</h2>
-            <!-- ERRORS WILL PRINT HERE -->
-            <span id="statusText" class="text-sm text-slate-400 font-mono">Loading Google Scripts...</span>
+        <!-- Cinema Player -->
+        <div id="playerContainer" class="hidden mb-16 animate-fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <h2 id="nowPlayingLabel" class="text-3xl font-bold text-white flex items-center gap-3">
+                    <i class="fa-solid fa-film text-blue-500"></i> Now Playing
+                </h2>
+                <button onclick="document.getElementById('videoPlayer').requestFullscreen()" class="text-slate-400 hover:text-white transition-colors">
+                    <i class="fa-solid fa-expand text-xl"></i>
+                </button>
+            </div>
+            <div class="relative bg-black rounded-2xl overflow-hidden shadow-2xl shadow-black/50 aspect-video ring-1 ring-white/10">
+                <video id="videoPlayer" class="w-full h-full object-contain bg-black" controls controlsList="nodownload"></video>
+            </div>
+        </div>
+
+        <!-- Library Header -->
+        <div class="mb-8 flex justify-between items-end border-b border-white/5 pb-4">
+            <h2 class="text-xl font-bold text-slate-300">Your Vault</h2>
+            <div id="statusIndicator" class="flex items-center gap-2 text-sm font-medium text-slate-500 bg-slate-900/50 px-4 py-2 rounded-full ring-1 ring-white/5">
+                <i class="fa-solid fa-circle-notch fa-spin hidden" id="loadingSpinner"></i>
+                <span id="statusText">Awaiting Authentication</span>
+            </div>
         </div>
         
-        <div id="fileGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+        <!-- Video Grid -->
+        <div id="fileGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
     </main>
 
-    <!-- Password Modal -->
-    <div id="passwordModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
-        <div class="bg-slate-800 border border-slate-700 p-8 rounded-2xl shadow-2xl w-full max-w-md">
-            <div class="flex items-center justify-center w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 mb-4 mx-auto">
-                <i class="fa-solid fa-lock text-xl"></i>
-            </div>
-            <h3 class="text-xl font-bold text-center mb-2">Unlock Archive</h3>
-            <p id="targetFileLabel" class="text-sm text-slate-400 text-center mb-6 truncate px-4"></p>
+    <!-- Sleek Password Modal -->
+    <div id="passwordModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-lg transition-all">
+        <div class="bg-slate-900 border border-white/10 p-8 rounded-3xl shadow-2xl w-full max-w-sm relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
             
-            <form id="unlockForm" class="flex flex-col gap-4">
-                <input type="password" id="archivePassword" placeholder="AES-256 Passphrase" required
-                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 focus:outline-none focus:border-blue-500">
+            <div class="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center text-blue-400 mb-6 border border-white/5">
+                <i class="fa-solid fa-lock text-2xl"></i>
+            </div>
+            
+            <h3 class="text-2xl font-bold text-white mb-1">Encrypted File</h3>
+            <p id="targetFileLabel" class="text-sm text-slate-400 mb-8 truncate"></p>
+            
+            <form id="unlockForm" class="flex flex-col gap-5">
+                <div class="relative">
+                    <i class="fa-solid fa-key absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                    <input type="password" id="archivePassword" placeholder="AES-256 Passphrase" required
+                        class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-12 pr-4 py-4 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-mono">
+                </div>
+                
                 <div class="flex gap-3 mt-2">
-                    <button type="button" id="cancelUnlock" class="flex-1 py-3 px-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-medium">Cancel</button>
-                    <button type="submit" class="flex-1 py-3 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-medium shadow-lg shadow-blue-500/20">Decrypt & Play</button>
+                    <button type="button" id="cancelUnlock" class="flex-1 py-4 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-bold text-slate-300 transition-all">Cancel</button>
+                    <button type="submit" class="flex-1 py-4 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-sm font-bold text-white shadow-lg shadow-blue-500/25 transition-all">Unlock</button>
                 </div>
             </form>
         </div>
